@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,14 +24,15 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(strings.screenSettings) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 }
             )
@@ -45,13 +47,13 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ADB Configuration
-            SettingsSection(title = "ADB 配置") {
+            SettingsSection(title = strings.adbConfig) {
                 OutlinedTextField(
                     value = uiState.adbPath,
                     onValueChange = { viewModel.setAdbPath(it) },
-                    label = { Text("ADB 路径") },
+                    label = { Text(strings.adbPath) },
                     modifier = Modifier.fillMaxWidth(),
-                    supportingText = { Text("默认 \"adb\"，可指定完整路径如 /data/local/tmp/adb") },
+                    supportingText = { Text(strings.adbPathHint) },
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -66,7 +68,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Filled.Check, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("检测")
+                        Text(strings.detect)
                     }
                     OutlinedButton(
                         onClick = { viewModel.autoDetectAdb() },
@@ -75,7 +77,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Filled.Search, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("自动查找")
+                        Text(strings.autoDetect)
                     }
                 }
                 if (uiState.adbStatus.isNotEmpty()) {
@@ -92,7 +94,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = uiState.fastbootPath,
                     onValueChange = { viewModel.setFastbootPath(it) },
-                    label = { Text("Fastboot 路径") },
+                    label = { Text(strings.fastbootPath) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -100,107 +102,87 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = uiState.defaultPort,
                     onValueChange = { viewModel.setDefaultPort(it) },
-                    label = { Text("默认端口") },
+                    label = { Text(strings.defaultPort) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
             }
 
             // Connection settings
-            SettingsSection(title = "连接设置") {
+            SettingsSection(title = strings.connectionSettings) {
                 SettingsSwitch(
-                    label = "自动连接上次设备",
+                    label = strings.autoConnectLastDevice,
                     checked = uiState.autoConnect,
                     onCheckedChange = { viewModel.setAutoConnect(it) }
                 )
                 SettingsSwitch(
-                    label = "保持屏幕常亮",
+                    label = strings.keepScreenOn,
                     checked = uiState.keepScreenOn,
                     onCheckedChange = { viewModel.setKeepScreenOn(it) }
                 )
                 SettingsSwitch(
-                    label = "保存命令历史",
+                    label = strings.saveCommandHistory,
                     checked = uiState.saveHistory,
                     onCheckedChange = { viewModel.setSaveHistory(it) }
                 )
             }
 
             // Safety settings
-            SettingsSection(title = "安全设置") {
+            SettingsSection(title = strings.safetySettings) {
                 SettingsSwitch(
-                    label = "危险操作确认",
-                    description = "卸载、重启、擦除等操作前需要确认",
+                    label = strings.confirmDangerous,
+                    description = strings.confirmDangerousDesc,
                     checked = uiState.confirmDangerous,
                     onCheckedChange = { viewModel.setConfirmDangerous(it) }
                 )
             }
 
             // Appearance settings
-            SettingsSection(title = "外观设置") {
+            SettingsSection(title = strings.appearanceSettings) {
                 SettingsSwitch(
-                    label = "深色模式",
+                    label = strings.darkMode,
                     checked = uiState.darkMode,
                     onCheckedChange = { viewModel.setDarkMode(it) }
                 )
                 SettingsSwitch(
-                    label = "动态颜色 (Material You)",
-                    description = "Android 12+ 根据壁纸生成主题色",
+                    label = strings.dynamicColor,
+                    description = strings.dynamicColorDesc,
                     checked = uiState.dynamicColor,
                     onCheckedChange = { viewModel.setDynamicColor(it) }
                 )
             }
 
-            // ADB Integration Guide
-            SettingsSection(title = "ADB 集成说明") {
-                Text(
-                    text = "本应用需要可用的 adb 二进制文件。Android 系统默认不包含 adb，您需要通过以下方式之一提供：",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "方案一：使用 Termux 安装 adb",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "1. 安装 Termux\n2. 执行: pkg install android-tools\n3. ADB 路径设为: adb (Termux环境下直接可用)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "方案二：手动放置 adb",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "1. 从 Android SDK Platform-Tools 下载对应架构的 adb\n" +
-                            "2. 将 adb 复制到 /data/local/tmp/adb\n" +
-                            "3. 执行: chmod +x /data/local/tmp/adb\n" +
-                            "4. 在上方设置路径为: /data/local/tmp/adb",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "方案三：Root 设备",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Root 后部分 ROM 自带 adb，路径通常为 /system/bin/adb",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // Language settings
+            SettingsSection(title = strings.languageSettings) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = strings.language, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = uiState.language == "zh",
+                            onClick = { viewModel.setLanguage("zh") },
+                            label = { Text(strings.chinese) }
+                        )
+                        FilterChip(
+                            selected = uiState.language == "en",
+                            onClick = { viewModel.setLanguage("en") },
+                            label = { Text(strings.english) }
+                        )
+                    }
+                }
             }
 
             // About section
-            SettingsSection(title = "关于") {
-                SettingsInfoRow("应用名称", "ADB Kit")
-                SettingsInfoRow("版本", "1.0.0")
-                SettingsInfoRow("开发者", "ADB Kit Team")
-                SettingsInfoRow("项目地址", "github.com/mofanx/adbkit")
+            SettingsSection(title = strings.about) {
+                SettingsInfoRow(strings.aboutAppName, "ADB Kit")
+                SettingsInfoRow(strings.aboutVersion, "1.0.0")
+                SettingsInfoRow(strings.aboutDeveloper, "ADB Kit Team")
+                SettingsInfoRow(strings.aboutRepo, "github.com/mofanx/adbkit")
             }
 
             Spacer(modifier = Modifier.height(32.dp))

@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 
 data class TerminalUiState(
     val currentCommand: String = "",
-    val outputLines: List<String> = listOf("--- ADB Kit Terminal ---", "输入命令开始执行"),
+    val outputLines: List<String> = listOf("--- ADB Kit Terminal ---"),
     val isShellMode: Boolean = true,
     val isExecuting: Boolean = false,
     val commandHistory: List<String> = emptyList(),
@@ -30,7 +30,7 @@ class TerminalViewModel : ViewModel() {
     fun toggleShellMode() {
         _uiState.update {
             val newMode = !it.isShellMode
-            val modeText = if (newMode) "--- 切换到 ADB Shell 模式 ---" else "--- 切换到 ADB 命令模式 ---"
+            val modeText = if (newMode) "--- ADB Shell Mode ---" else "--- ADB Command Mode ---"
             it.copy(isShellMode = newMode, outputLines = it.outputLines + modeText)
         }
     }
@@ -40,7 +40,7 @@ class TerminalViewModel : ViewModel() {
     }
 
     fun clearOutput() {
-        _uiState.update { it.copy(outputLines = listOf("--- 已清屏 ---")) }
+        _uiState.update { it.copy(outputLines = listOf("--- Cleared ---")) }
     }
 
     fun executeCommand() {
@@ -69,10 +69,10 @@ class TerminalViewModel : ViewModel() {
                 outputLines.addAll(result.output.lines())
             }
             if (result.error.isNotEmpty()) {
-                outputLines.addAll(result.error.lines().map { "错误: $it" })
+                outputLines.addAll(result.error.lines().map { "ERR: $it" })
             }
             if (outputLines.isEmpty()) {
-                outputLines.add(if (result.success) "(命令执行成功，无输出)" else "(命令执行失败)")
+                outputLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
             }
 
             _uiState.update {

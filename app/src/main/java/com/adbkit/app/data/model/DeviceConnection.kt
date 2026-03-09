@@ -90,10 +90,10 @@ data class FileItem(
 }
 
 data class RemoteControlConfig(
-    val resolution: String = "自动调整",
+    val resolution: String = "auto",
     val bitrate: String = "8Mbps",
-    val aspectRatio: String = "保持原始比例",
-    val navBarPosition: String = "悬浮",
+    val aspectRatio: String = "original",
+    val navBarPosition: String = "floating",
     val fullscreen: Boolean = false,
     val screenOff: Boolean = false,
     val compatMode: Boolean = false

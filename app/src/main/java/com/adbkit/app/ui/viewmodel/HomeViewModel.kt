@@ -35,11 +35,11 @@ class HomeViewModel : ViewModel() {
     fun connectDevice() {
         val ip = _uiState.value.ipAddress.trim()
         if (ip.isEmpty()) {
-            _uiState.update { it.copy(statusMessage = "请输入IP地址", isError = true) }
+            _uiState.update { it.copy(statusMessage = "Please enter IP address", isError = true) }
             return
         }
         val address = if (ip.contains(":")) ip else "$ip:5555"
-        _uiState.update { it.copy(isConnecting = true, statusMessage = "正在连接...") }
+        _uiState.update { it.copy(isConnecting = true, statusMessage = "Connecting...") }
         viewModelScope.launch {
             val result = AdbService.connect(address)
             if (result.success && result.output.contains("connected")) {
@@ -48,7 +48,7 @@ class HomeViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
-                        statusMessage = "连接成功",
+                        statusMessage = "Connected",
                         isError = false,
                         selectedDevice = address
                     )
@@ -57,7 +57,7 @@ class HomeViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
-                        statusMessage = result.error.ifEmpty { result.output.ifEmpty { "连接失败" } },
+                        statusMessage = result.error.ifEmpty { result.output.ifEmpty { "Connection failed" } },
                         isError = true
                     )
                 }
@@ -72,13 +72,13 @@ class HomeViewModel : ViewModel() {
                 AdbService.setCurrentDevice(null)
             }
             refreshDevices()
-            _uiState.update { it.copy(statusMessage = "已断开 $device", isError = false) }
+            _uiState.update { it.copy(statusMessage = "Disconnected $device", isError = false) }
         }
     }
 
     fun selectDevice(device: String) {
         AdbService.setCurrentDevice(device)
-        _uiState.update { it.copy(selectedDevice = device, statusMessage = "已选择 $device") }
+        _uiState.update { it.copy(selectedDevice = device, statusMessage = "Selected $device") }
     }
 
     fun refreshDevices() {
@@ -89,7 +89,7 @@ class HomeViewModel : ViewModel() {
     }
 
     fun scanDevices() {
-        _uiState.update { it.copy(statusMessage = "正在扫描网络设备...", isError = false) }
+        _uiState.update { it.copy(statusMessage = "Scanning...", isError = false) }
         viewModelScope.launch {
             // Get local IP range
             val ipResult = AdbService.executeCommand("ip route | grep src | head -1")
@@ -99,9 +99,9 @@ class HomeViewModel : ViewModel() {
 
             if (localIp.isNotEmpty()) {
                 val subnet = localIp.substringBeforeLast(".")
-                _uiState.update { it.copy(ipAddress = subnet, statusMessage = "子网: $subnet.0/24") }
+                _uiState.update { it.copy(ipAddress = subnet, statusMessage = "Subnet: $subnet.0/24") }
             } else {
-                _uiState.update { it.copy(statusMessage = "无法获取本地IP", isError = true) }
+                _uiState.update { it.copy(statusMessage = "Cannot get local IP", isError = true) }
             }
         }
     }
@@ -120,18 +120,18 @@ class HomeViewModel : ViewModel() {
 
     fun pairDevice(ip: String, port: String, code: String) {
         if (ip.isBlank() || port.isBlank() || code.isBlank()) {
-            _uiState.update { it.copy(statusMessage = "请填写完整信息", isError = true) }
+            _uiState.update { it.copy(statusMessage = "Please fill in all fields", isError = true) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(showPairDialog = false, statusMessage = "正在配对...") }
+            _uiState.update { it.copy(showPairDialog = false, statusMessage = "Pairing...") }
             val result = AdbService.executeCommand("${AdbService.getAdbPath()} pair $ip:$port $code")
             if (result.success && result.output.contains("Successfully")) {
-                _uiState.update { it.copy(statusMessage = "配对成功", isError = false) }
+                _uiState.update { it.copy(statusMessage = "Pairing successful", isError = false) }
                 refreshDevices()
             } else {
                 _uiState.update {
-                    it.copy(statusMessage = result.error.ifEmpty { "配对失败" }, isError = true)
+                    it.copy(statusMessage = result.error.ifEmpty { "Pairing failed" }, isError = true)
                 }
             }
         }
@@ -139,14 +139,14 @@ class HomeViewModel : ViewModel() {
 
     fun restartAdbServer() {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "正在重启 ADB 服务...", isError = false) }
+            _uiState.update { it.copy(statusMessage = "Restarting ADB...", isError = false) }
             val result = AdbService.restartServer()
             if (result.success) {
-                _uiState.update { it.copy(statusMessage = "ADB 服务已重启", isError = false) }
+                _uiState.update { it.copy(statusMessage = "ADB restarted", isError = false) }
                 refreshDevices()
             } else {
                 _uiState.update {
-                    it.copy(statusMessage = "重启失败: ${result.error}", isError = true)
+                    it.copy(statusMessage = "Restart failed: ${result.error}", isError = true)
                 }
             }
         }
@@ -157,7 +157,7 @@ class HomeViewModel : ViewModel() {
             AdbService.disconnectAll()
             AdbService.setCurrentDevice(null)
             refreshDevices()
-            _uiState.update { it.copy(statusMessage = "已断开所有设备", isError = false, selectedDevice = null) }
+            _uiState.update { it.copy(statusMessage = "All disconnected", isError = false, selectedDevice = null) }
         }
     }
 }

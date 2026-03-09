@@ -31,7 +31,7 @@ class FastbootViewModel : ViewModel() {
             val result = AdbService.fastbootDevices()
             val hasDevice = result.success && result.output.isNotBlank() && result.output.contains("fastboot")
             _uiState.update { it.copy(deviceDetected = hasDevice) }
-            appendOutput(if (hasDevice) "检测到 Fastboot 设备" else "未检测到 Fastboot 设备")
+            appendOutput(if (hasDevice) "Fastboot device detected" else "No Fastboot device found")
         }
     }
 

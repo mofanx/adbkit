@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.TerminalViewModel
 import kotlinx.coroutines.launch
 
@@ -28,6 +29,7 @@ fun TerminalScreen(
     viewModel: TerminalViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -41,20 +43,20 @@ fun TerminalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("运行命令") },
+                title = { Text(strings.screenTerminal) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.clearOutput() }) {
-                        Icon(Icons.Filled.DeleteSweep, contentDescription = "清屏")
+                        Icon(Icons.Filled.DeleteSweep, contentDescription = strings.clearScreen)
                     }
                     IconButton(onClick = { viewModel.toggleShellMode() }) {
                         Icon(
                             if (uiState.isShellMode) Icons.Filled.Code else Icons.Filled.Build,
-                            contentDescription = "切换模式"
+                            contentDescription = strings.switchMode
                         )
                     }
                 }
@@ -77,12 +79,12 @@ fun TerminalScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (uiState.isShellMode) "ADB Shell 模式" else "ADB 命令模式",
+                        text = if (uiState.isShellMode) strings.adbShellMode else strings.adbCommandMode,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        text = uiState.currentDevice ?: "未连接",
+                        text = uiState.currentDevice ?: strings.notConnected,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -123,7 +125,7 @@ fun TerminalScreen(
                         text = line,
                         color = when {
                             line.startsWith("$ ") || line.startsWith(">>> ") -> Color(0xFF4EC9B0)
-                            line.startsWith("错误:") || line.startsWith("Error:") -> Color(0xFFFF6B6B)
+                            line.startsWith("ERR:") || line.startsWith("Error:") -> Color(0xFFFF6B6B)
                             line.startsWith("---") -> Color(0xFF569CD6)
                             else -> Color(0xFFD4D4D4)
                         },
@@ -182,14 +184,14 @@ fun TerminalScreen(
                         value = uiState.currentCommand,
                         onValueChange = { viewModel.setCommand(it) },
                         modifier = Modifier.weight(1f),
-                        placeholder = { Text("输入命令...") },
+                        placeholder = { Text(strings.enterCommand) },
                         singleLine = true,
                         shape = RoundedCornerShape(20.dp),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     IconButton(onClick = { viewModel.toggleHistory() }) {
-                        Icon(Icons.Filled.History, contentDescription = "历史")
+                        Icon(Icons.Filled.History, contentDescription = strings.history)
                     }
                     FilledIconButton(
                         onClick = { viewModel.executeCommand() },
@@ -202,7 +204,7 @@ fun TerminalScreen(
                                 color = MaterialTheme.colorScheme.onPrimary
                             )
                         } else {
-                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "执行")
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = strings.execute)
                         }
                     }
                 }

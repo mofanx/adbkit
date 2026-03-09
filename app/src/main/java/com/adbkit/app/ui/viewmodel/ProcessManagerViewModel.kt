@@ -35,7 +35,7 @@ class ProcessManagerViewModel : ViewModel() {
 
     fun refresh() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "请先连接设备", isLoading = false) }
+            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -44,7 +44,7 @@ class ProcessManagerViewModel : ViewModel() {
                 val processes = AdbService.getProcessList()
                 _uiState.update { it.copy(processes = processes, isLoading = false) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "获取失败", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
             }
         }
     }
@@ -63,7 +63,7 @@ class ProcessManagerViewModel : ViewModel() {
             if (result.success) {
                 refresh()
             } else {
-                _uiState.update { it.copy(statusMessage = "结束进程失败: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = "Kill failed: ${result.error}") }
             }
         }
     }

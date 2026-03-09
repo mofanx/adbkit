@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.ToolsViewModel
 
 data class ToolItem(
@@ -33,37 +34,38 @@ fun ToolsScreen(
     viewModel: ToolsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     val tools = listOf(
-        ToolItem("截图", Icons.Outlined.PhotoCamera, "screenshot", "截取设备屏幕"),
-        ToolItem("录屏", Icons.Outlined.Videocam, "screenrecord", "录制设备屏幕"),
-        ToolItem("安装APK", Icons.Outlined.GetApp, "install", "安装应用程序"),
-        ToolItem("重启设备", Icons.Outlined.Refresh, "reboot", "重启到不同模式"),
-        ToolItem("输入文本", Icons.Outlined.Keyboard, "input_text", "向设备输入文字"),
-        ToolItem("按键模拟", Icons.Outlined.Gesture, "key_event", "模拟按键操作"),
-        ToolItem("屏幕亮度", Icons.Outlined.WbSunny, "brightness", "调节屏幕亮度"),
-        ToolItem("屏幕超时", Icons.Outlined.Timer, "screen_timeout", "设置屏幕自动关闭时间"),
-        ToolItem("WiFi开关", Icons.Outlined.Wifi, "wifi", "开关WiFi"),
-        ToolItem("蓝牙开关", Icons.Filled.Bluetooth, "bluetooth", "开关蓝牙"),
-        ToolItem("飞行模式", Icons.Outlined.AirplanemodeActive, "airplane", "开关飞行模式"),
-        ToolItem("打开链接", Icons.Outlined.Link, "open_url", "在设备上打开URL"),
-        ToolItem("启动应用", Icons.AutoMirrored.Outlined.OpenInNew, "launch_app", "启动指定应用"),
-        ToolItem("当前Activity", Icons.Outlined.Layers, "current_activity", "查看当前Activity"),
-        ToolItem("Logcat", Icons.Filled.BugReport, "logcat", "查看系统日志"),
-        ToolItem("系统属性", Icons.Outlined.Settings, "sysprop", "查看/修改系统属性"),
-        ToolItem("屏幕密度", Icons.Outlined.Fullscreen, "density", "修改屏幕密度DPI"),
-        ToolItem("屏幕分辨率", Icons.Outlined.FitScreen, "resolution", "修改屏幕分辨率"),
-        ToolItem("导航栏", Icons.Outlined.VerticalAlignBottom, "navbar", "显示/隐藏导航栏"),
-        ToolItem("状态栏", Icons.Outlined.VerticalAlignTop, "statusbar", "显示/隐藏状态栏"),
+        ToolItem(strings.toolScreenshot, Icons.Outlined.PhotoCamera, "screenshot", strings.toolDescScreenshot),
+        ToolItem(strings.toolScreenRecord, Icons.Outlined.Videocam, "screenrecord", strings.toolDescScreenRecord),
+        ToolItem(strings.toolInstallApk, Icons.Outlined.GetApp, "install", strings.toolDescInstallApk),
+        ToolItem(strings.toolRebootDevice, Icons.Outlined.Refresh, "reboot", strings.toolDescRebootDevice),
+        ToolItem(strings.toolInputText, Icons.Outlined.Keyboard, "input_text", strings.toolDescInputText),
+        ToolItem(strings.toolKeyEvent, Icons.Outlined.Gesture, "key_event", strings.toolDescKeyEvent),
+        ToolItem(strings.toolBrightness, Icons.Outlined.WbSunny, "brightness", strings.toolDescBrightness),
+        ToolItem(strings.toolScreenTimeout, Icons.Outlined.Timer, "screen_timeout", strings.toolDescScreenTimeout),
+        ToolItem(strings.toolWifiToggle, Icons.Outlined.Wifi, "wifi", strings.toolDescWifiToggle),
+        ToolItem(strings.toolBluetoothToggle, Icons.Filled.Bluetooth, "bluetooth", strings.toolDescBluetoothToggle),
+        ToolItem(strings.toolAirplaneMode, Icons.Outlined.AirplanemodeActive, "airplane", strings.toolDescAirplaneMode),
+        ToolItem(strings.toolOpenUrl, Icons.Outlined.Link, "open_url", strings.toolDescOpenUrl),
+        ToolItem(strings.toolLaunchApp, Icons.AutoMirrored.Outlined.OpenInNew, "launch_app", strings.toolDescLaunchApp),
+        ToolItem(strings.toolCurrentActivity, Icons.Outlined.Layers, "current_activity", strings.toolDescCurrentActivity),
+        ToolItem(strings.toolLogcat, Icons.Filled.BugReport, "logcat", strings.toolDescLogcat),
+        ToolItem(strings.toolSystemProperties, Icons.Outlined.Settings, "sysprop", strings.toolDescSystemProperties),
+        ToolItem(strings.toolScreenDensity, Icons.Outlined.Fullscreen, "density", strings.toolDescScreenDensity),
+        ToolItem(strings.toolScreenResolution, Icons.Outlined.FitScreen, "resolution", strings.toolDescScreenResolution),
+        ToolItem(strings.toolNavBar, Icons.Outlined.VerticalAlignBottom, "navbar", strings.toolDescNavBar),
+        ToolItem(strings.toolStatusBar, Icons.Outlined.VerticalAlignTop, "statusbar", strings.toolDescStatusBar),
     )
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("实用工具") },
+                title = { Text(strings.screenTools) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 }
             )
@@ -135,7 +137,7 @@ fun ToolsScreen(
                 modifier = Modifier.padding(16.dp),
                 action = {
                     TextButton(onClick = { viewModel.clearStatus() }) {
-                        Text("确定")
+                        Text(LocalStrings.current.ok)
                     }
                 }
             ) {
@@ -180,17 +182,18 @@ fun ToolCard(tool: ToolItem, onClick: () -> Unit) {
 
 @Composable
 fun RebootDialog(onDismiss: () -> Unit, onReboot: (String) -> Unit) {
+    val strings = LocalStrings.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("重启设备") },
+        title = { Text(strings.rebootDevice) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 listOf(
-                    "" to "正常重启",
-                    "recovery" to "重启到Recovery",
-                    "bootloader" to "重启到Bootloader",
-                    "fastboot" to "重启到Fastboot",
-                    "edl" to "重启到EDL(9008)"
+                    "" to strings.normalReboot,
+                    "recovery" to strings.rebootToRecovery,
+                    "bootloader" to strings.rebootToBootloader,
+                    "fastboot" to strings.rebootToFastboot,
+                    "edl" to strings.rebootToEdl
                 ).forEach { (mode, label) ->
                     TextButton(
                         onClick = { onReboot(mode) },
@@ -203,46 +206,48 @@ fun RebootDialog(onDismiss: () -> Unit, onReboot: (String) -> Unit) {
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(LocalStrings.current.cancel) }
         }
     )
 }
 
 @Composable
 fun InputTextDialog(onDismiss: () -> Unit, onSend: (String) -> Unit) {
+    val strings = LocalStrings.current
     var text by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("输入文本") },
+        title = { Text(strings.inputText) },
         text = {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                label = { Text("文本内容") },
+                label = { Text(strings.textContent) },
                 modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSend(text) }) { Text("发送") }
+            TextButton(onClick = { onSend(text) }) { Text(strings.send) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
 @Composable
 fun KeyEventDialog(onDismiss: () -> Unit, onSend: (Int) -> Unit) {
+    val strings = LocalStrings.current
     val keyEvents = listOf(
-        3 to "Home", 4 to "Back", 24 to "音量+", 25 to "音量-",
-        26 to "电源键", 82 to "菜单", 187 to "最近任务",
-        164 to "静音", 223 to "休眠", 224 to "唤醒",
-        61 to "Tab", 66 to "Enter", 67 to "退格",
-        111 to "Esc", 120 to "截图"
+        3 to strings.keyHome, 4 to strings.keyBack, 24 to strings.keyVolUp, 25 to strings.keyVolDown,
+        26 to strings.keyPower, 82 to strings.keyMenu, 187 to strings.keyRecent,
+        164 to strings.keyMute, 223 to strings.keySleep, 224 to strings.keyWake,
+        61 to strings.keyTab, 66 to strings.keyEnter, 67 to strings.keyBackspace,
+        111 to strings.keyEsc, 120 to strings.keyScreenshot
     )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("按键模拟") },
+        title = { Text(strings.keyEvent) },
         text = {
             Column {
                 keyEvents.chunked(3).forEach { row ->
@@ -270,20 +275,21 @@ fun KeyEventDialog(onDismiss: () -> Unit, onSend: (Int) -> Unit) {
         },
         confirmButton = {},
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text(LocalStrings.current.close) }
         }
     )
 }
 
 @Composable
 fun BrightnessDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
+    val strings = LocalStrings.current
     var brightness by remember { mutableFloatStateOf(128f) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("屏幕亮度") },
+        title = { Text(strings.screenBrightness) },
         text = {
             Column {
-                Text("亮度值: ${brightness.toInt()}")
+                Text(strings.brightnessValue(brightness.toInt()))
                 Slider(
                     value = brightness,
                     onValueChange = { brightness = it },
@@ -292,20 +298,21 @@ fun BrightnessDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSet(brightness.toInt()) }) { Text("设置") }
+            TextButton(onClick = { onSet(brightness.toInt()) }) { Text(strings.set) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
 @Composable
 fun OpenUrlDialog(onDismiss: () -> Unit, onOpen: (String) -> Unit) {
+    val strings = LocalStrings.current
     var url by remember { mutableStateOf("https://") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("打开链接") },
+        title = { Text(strings.openUrl) },
         text = {
             OutlinedTextField(
                 value = url,
@@ -315,98 +322,101 @@ fun OpenUrlDialog(onDismiss: () -> Unit, onOpen: (String) -> Unit) {
             )
         },
         confirmButton = {
-            TextButton(onClick = { onOpen(url) }) { Text("打开") }
+            TextButton(onClick = { onOpen(url) }) { Text(strings.ok) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
 @Composable
 fun LaunchAppDialog(onDismiss: () -> Unit, onLaunch: (String) -> Unit) {
+    val strings = LocalStrings.current
     var pkg by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("启动应用") },
+        title = { Text(strings.launchApp) },
         text = {
             OutlinedTextField(
                 value = pkg,
                 onValueChange = { pkg = it },
-                label = { Text("包名") },
+                label = { Text(strings.packageName) },
                 placeholder = { Text("com.example.app") },
                 modifier = Modifier.fillMaxWidth()
             )
         },
         confirmButton = {
-            TextButton(onClick = { onLaunch(pkg) }) { Text("启动") }
+            TextButton(onClick = { onLaunch(pkg) }) { Text(strings.launch) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
 @Composable
 fun DensityDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
+    val strings = LocalStrings.current
     var dpi by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("修改屏幕密度") },
+        title = { Text(strings.modifyDensity) },
         text = {
             Column {
-                Text("常见DPI: 120(ldpi), 160(mdpi), 240(hdpi), 320(xhdpi), 480(xxhdpi), 640(xxxhdpi)",
+                Text(strings.commonDpi,
                     style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = dpi,
                     onValueChange = { dpi = it },
-                    label = { Text("DPI值") },
+                    label = { Text(strings.dpiValue) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 TextButton(onClick = { onSet("reset") }) {
-                    Text("恢复默认")
+                    Text(strings.resetDefault)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSet(dpi) }) { Text("设置") }
+            TextButton(onClick = { onSet(dpi) }) { Text(strings.set) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
 
 @Composable
 fun ResolutionDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
+    val strings = LocalStrings.current
     var resolution by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("修改屏幕分辨率") },
+        title = { Text(strings.modifyResolution) },
         text = {
             Column {
-                Text("格式: 宽x高 (例如: 1080x1920)", style = MaterialTheme.typography.bodySmall)
+                Text(strings.resolutionFormat, style = MaterialTheme.typography.bodySmall)
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = resolution,
                     onValueChange = { resolution = it },
-                    label = { Text("分辨率") },
+                    label = { Text(strings.resolution) },
                     placeholder = { Text("1080x1920") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 TextButton(onClick = { onSet("reset") }) {
-                    Text("恢复默认")
+                    Text(strings.resetDefault)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSet(resolution) }) { Text("设置") }
+            TextButton(onClick = { onSet(resolution) }) { Text(strings.set) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(strings.cancel) }
         }
     )
 }
@@ -429,10 +439,10 @@ fun LogcatViewDialog(
                 Text("Logcat")
                 Row {
                     IconButton(onClick = onRefresh) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                        Icon(Icons.Filled.Refresh, contentDescription = LocalStrings.current.refresh)
                     }
                     IconButton(onClick = onClear) {
-                        Icon(Icons.Filled.Delete, contentDescription = "清除")
+                        Icon(Icons.Filled.Delete, contentDescription = LocalStrings.current.clear)
                     }
                 }
             }
@@ -446,7 +456,7 @@ fun LogcatViewDialog(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = output.ifEmpty { "无日志" },
+                    text = output.ifEmpty { LocalStrings.current.noLog },
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(8.dp),
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
@@ -454,7 +464,7 @@ fun LogcatViewDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text(LocalStrings.current.close) }
         }
     )
 }

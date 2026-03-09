@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +26,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
@@ -32,54 +34,45 @@ fun HomeScreen(
                 title = {},
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refreshDevices() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                        Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
                     }
                     IconButton(onClick = { viewModel.togglePairDialog() }) {
-                        Icon(Icons.Filled.Link, contentDescription = "配对")
+                        Icon(Icons.Filled.Link, contentDescription = strings.pair)
                     }
                     IconButton(onClick = onNavigateToFastboot) {
-                        Icon(Icons.Filled.Star, contentDescription = "Fastboot")
+                        Icon(Icons.Filled.FlashOn, contentDescription = strings.fastboot)
                     }
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "设置")
+                        Icon(Icons.Filled.Settings, contentDescription = strings.settings)
                     }
                     Box {
                         IconButton(onClick = { viewModel.toggleMoreMenu() }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                            Icon(Icons.Filled.MoreVert, contentDescription = strings.more)
                         }
                         DropdownMenu(
                             expanded = uiState.showMoreMenu,
                             onDismissRequest = { viewModel.dismissMoreMenu() }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("重启 ADB 服务") },
+                                text = { Text(strings.restartAdbService) },
                                 onClick = {
                                     viewModel.dismissMoreMenu()
                                     viewModel.restartAdbServer()
                                 },
-                                leadingIcon = { Icon(Icons.Filled.Refresh, null) }
+                                leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, null) }
                             )
                             DropdownMenuItem(
-                                text = { Text("断开所有设备") },
+                                text = { Text(strings.disconnectAll) },
                                 onClick = {
                                     viewModel.dismissMoreMenu()
                                     viewModel.disconnectAll()
                                 },
                                 leadingIcon = { Icon(Icons.Filled.LinkOff, null) }
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("设置") },
-                                onClick = {
-                                    viewModel.dismissMoreMenu()
-                                    onNavigateToSettings()
-                                },
-                                leadingIcon = { Icon(Icons.Filled.Settings, null) }
                             )
                         }
                     }
@@ -115,7 +108,7 @@ fun HomeScreen(
                 leadingIcon = { Icon(Icons.Filled.History, contentDescription = null) },
                 trailingIcon = {
                     IconButton(onClick = { viewModel.scanDevices() }) {
-                        Icon(Icons.Filled.Search, contentDescription = "扫描")
+                        Icon(Icons.Filled.Search, contentDescription = strings.scan)
                     }
                 },
                 singleLine = true,
@@ -141,7 +134,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text("连接", style = MaterialTheme.typography.bodyLarge)
+                Text(strings.connect, style = MaterialTheme.typography.bodyLarge)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -149,7 +142,7 @@ fun HomeScreen(
             // Connected devices count
             if (uiState.connectedDevices.isNotEmpty()) {
                 Text(
-                    text = "已连接${uiState.connectedDevices.size}个设备",
+                    text = strings.connectedDevices(uiState.connectedDevices.size),
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -237,7 +230,7 @@ fun DeviceCard(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = if (device.contains(":")) "WiFi连接" else "USB连接",
+                    text = if (device.contains(":")) LocalStrings.current.wifiConnection else LocalStrings.current.usbConnection,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -245,7 +238,7 @@ fun DeviceCard(
             IconButton(onClick = onDisconnect) {
                 Icon(
                     Icons.Filled.LinkOff,
-                    contentDescription = "断开",
+                    contentDescription = LocalStrings.current.disconnect,
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -269,31 +262,31 @@ fun WirelessPairDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("无线配对") },
+        title = { Text(LocalStrings.current.wirelessPair) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Android 11+ 支持无线调试配对。请在设备设置 > 开发者选项 > 无线调试中获取配对信息。",
+                    LocalStrings.current.wirelessPairDesc,
                     style = MaterialTheme.typography.bodySmall
                 )
                 OutlinedTextField(
                     value = ip,
                     onValueChange = { ip = it },
-                    label = { Text("IP地址") },
+                    label = { Text(LocalStrings.current.ipAddress) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = port,
                     onValueChange = { port = it },
-                    label = { Text("端口") },
+                    label = { Text(LocalStrings.current.port) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = pairCode,
                     onValueChange = { pairCode = it },
-                    label = { Text("配对码") },
+                    label = { Text(LocalStrings.current.pairCode) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -301,12 +294,12 @@ fun WirelessPairDialog(
         },
         confirmButton = {
             TextButton(onClick = { onPair(ip, port, pairCode) }) {
-                Text("配对")
+                Text(LocalStrings.current.pair)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(LocalStrings.current.cancel)
             }
         }
     )

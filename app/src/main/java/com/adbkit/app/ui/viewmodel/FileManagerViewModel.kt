@@ -28,7 +28,7 @@ class FileManagerViewModel : ViewModel() {
 
     private fun loadFiles() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "请先连接设备", isLoading = false) }
+            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -42,7 +42,7 @@ class FileManagerViewModel : ViewModel() {
                 )
                 _uiState.update { it.copy(files = sorted, isLoading = false) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "加载失败", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
             }
         }
     }
@@ -73,7 +73,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "删除失败: ${result.error}") }
+                _uiState.update { it.copy(error = "Delete failed: ${result.error}") }
             }
         }
     }
@@ -83,7 +83,7 @@ class FileManagerViewModel : ViewModel() {
             val localPath = "/sdcard/Download/$fileName"
             val result = AdbService.pullFile(remotePath, localPath)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "已下载到 $localPath" else "下载失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Downloaded to $localPath" else "Download failed: ${result.error}")
             }
         }
     }
@@ -105,7 +105,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "创建失败: ${result.error}") }
+                _uiState.update { it.copy(error = "Create failed: ${result.error}") }
             }
         }
     }

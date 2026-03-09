@@ -22,6 +22,7 @@ class SettingsRepository(private val context: Context) {
         val CONFIRM_DANGEROUS = booleanPreferencesKey("confirm_dangerous")
         val SAVE_HISTORY = booleanPreferencesKey("save_history")
         val LAST_DEVICE_IP = stringPreferencesKey("last_device_ip")
+        val LANGUAGE = stringPreferencesKey("language")
     }
 
     val adbPath: Flow<String> = context.dataStore.data.map { it[ADB_PATH] ?: "adb" }
@@ -34,6 +35,7 @@ class SettingsRepository(private val context: Context) {
     val confirmDangerous: Flow<Boolean> = context.dataStore.data.map { it[CONFIRM_DANGEROUS] ?: true }
     val saveHistory: Flow<Boolean> = context.dataStore.data.map { it[SAVE_HISTORY] ?: true }
     val lastDeviceIp: Flow<String> = context.dataStore.data.map { it[LAST_DEVICE_IP] ?: "" }
+    val language: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "zh" }
 
     suspend fun setAdbPath(path: String) {
         context.dataStore.edit { it[ADB_PATH] = path }
@@ -73,5 +75,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setLastDeviceIp(ip: String) {
         context.dataStore.edit { it[LAST_DEVICE_IP] = ip }
+    }
+
+    suspend fun setLanguage(lang: String) {
+        context.dataStore.edit { it[LANGUAGE] = lang }
     }
 }

@@ -29,7 +29,7 @@ class DeviceInfoViewModel : ViewModel() {
 
     fun refresh() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "请先连接设备", isLoading = false) }
+            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -38,7 +38,7 @@ class DeviceInfoViewModel : ViewModel() {
                 val info = AdbService.getDeviceInfo()
                 _uiState.update { it.copy(deviceInfo = info, isLoading = false) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "获取失败", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: "Failed to get info", isLoading = false) }
             }
         }
     }

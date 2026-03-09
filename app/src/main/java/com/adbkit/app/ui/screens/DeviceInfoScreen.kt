@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.DeviceInfoViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,22 +22,23 @@ fun DeviceInfoScreen(
     viewModel: DeviceInfoViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设备信息") },
+                title = { Text(strings.screenDeviceInfo) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                        Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
                     }
                     IconButton(onClick = { viewModel.copyAll() }) {
-                        Icon(Icons.Filled.ContentCopy, contentDescription = "复制全部")
+                        Icon(Icons.Filled.ContentCopy, contentDescription = strings.copyAll)
                     }
                 }
             )
@@ -52,7 +54,7 @@ fun DeviceInfoScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator()
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("正在获取设备信息...")
+                    Text(strings.gettingDeviceInfo)
                 }
             }
         } else if (uiState.error.isNotEmpty()) {
@@ -73,7 +75,7 @@ fun DeviceInfoScreen(
                     Text(uiState.error, color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = { viewModel.refresh() }) {
-                        Text("重试")
+                        Text(strings.retry)
                     }
                 }
             }
@@ -85,19 +87,47 @@ fun DeviceInfoScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Group info by categories
+                // Internal key -> localized label mapping
+                val keyLabels = mapOf(
+                    "model" to strings.diModel,
+                    "brand" to strings.diBrand,
+                    "device_name" to strings.diDeviceName,
+                    "serial" to strings.diSerialNumber,
+                    "hardware" to strings.diHardware,
+                    "android_version" to strings.diAndroidVersion,
+                    "sdk_version" to strings.diSdkVersion,
+                    "build_id" to strings.diBuildId,
+                    "security_patch" to strings.diSecurityPatch,
+                    "baseband" to strings.diBasebandVersion,
+                    "kernel" to strings.diKernelVersion,
+                    "cpu_arch" to strings.diCpuArch,
+                    "screen_resolution" to strings.diScreenResolution,
+                    "screen_density" to strings.diScreenDensity,
+                    "total_memory" to strings.diTotalMemory,
+                    "available_memory" to strings.diAvailableMemory,
+                    "total_storage" to strings.diTotalStorage,
+                    "available_storage" to strings.diAvailableStorage,
+                    "battery_level" to strings.diBatteryLevel,
+                    "battery_status" to strings.diBatteryStatus,
+                    "battery_temp" to strings.diBatteryTemperature,
+                    "ip_address" to strings.diIpAddress,
+                    "wifi_mac" to strings.diWifiMac,
+                    "uptime" to strings.diUptime
+                )
+
+                // Group info by categories (using internal keys)
                 val categories = listOf(
-                    "基本信息" to listOf("型号", "品牌", "设备名", "序列号", "硬件"),
-                    "系统信息" to listOf("Android版本", "SDK版本", "Build ID", "安全补丁", "基带版本", "内核版本"),
-                    "硬件信息" to listOf("CPU架构", "屏幕分辨率", "屏幕密度", "总内存", "可用内存", "存储总量", "存储可用"),
-                    "电池信息" to listOf("电池电量", "电池状态", "电池温度"),
-                    "网络信息" to listOf("IP地址", "WiFi MAC"),
-                    "其他" to listOf("运行时间")
+                    strings.basicInfo to listOf("model", "brand", "device_name", "serial", "hardware"),
+                    strings.systemInfo to listOf("android_version", "sdk_version", "build_id", "security_patch", "baseband", "kernel"),
+                    strings.hardwareInfo to listOf("cpu_arch", "screen_resolution", "screen_density", "total_memory", "available_memory", "total_storage", "available_storage"),
+                    strings.batteryInfo to listOf("battery_level", "battery_status", "battery_temp"),
+                    strings.networkInfo to listOf("ip_address", "wifi_mac"),
+                    strings.otherInfo to listOf("uptime")
                 )
 
                 categories.forEach { (category, keys) ->
                     val filteredItems = keys.mapNotNull { key ->
-                        uiState.deviceInfo[key]?.let { key to it }
+                        uiState.deviceInfo[key]?.let { (keyLabels[key] ?: key) to it }
                     }
                     if (filteredItems.isNotEmpty()) {
                         item {
@@ -109,8 +139,8 @@ fun DeviceInfoScreen(
                                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
                             )
                         }
-                        items(filteredItems) { (key, value) ->
-                            InfoRow(label = key, value = value)
+                        items(filteredItems) { (label, value) ->
+                            InfoRow(label = label, value = value)
                         }
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
@@ -124,7 +154,7 @@ fun DeviceInfoScreen(
                 if (uncategorized.isNotEmpty()) {
                     item {
                         Text(
-                            text = "更多信息",
+                            text = strings.moreInfo,
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -132,7 +162,7 @@ fun DeviceInfoScreen(
                         )
                     }
                     items(uncategorized.toList()) { (key, value) ->
-                        InfoRow(label = key, value = value)
+                        InfoRow(label = keyLabels[key] ?: key, value = value)
                     }
                 }
             }

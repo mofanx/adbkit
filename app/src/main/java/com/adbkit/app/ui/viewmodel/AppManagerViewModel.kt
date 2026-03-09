@@ -42,7 +42,7 @@ class AppManagerViewModel : ViewModel() {
 
     fun refresh() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "请先连接设备", isLoading = false) }
+            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -54,7 +54,7 @@ class AppManagerViewModel : ViewModel() {
                     it.copy(userPackages = userApps, systemPackages = sysApps, isLoading = false)
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "加载失败", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
             }
         }
     }
@@ -75,7 +75,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.forceStopApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg 已强制停止" else "操作失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "$pkg force stopped" else "Failed: ${result.error}")
             }
         }
     }
@@ -85,9 +85,9 @@ class AppManagerViewModel : ViewModel() {
             val result = AdbService.uninstallApp(pkg)
             if (result.success) {
                 refresh()
-                _uiState.update { it.copy(statusMessage = "$pkg 已卸载") }
+                _uiState.update { it.copy(statusMessage = "$pkg uninstalled") }
             } else {
-                _uiState.update { it.copy(statusMessage = "卸载失败: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = "Uninstall failed: ${result.error}") }
             }
         }
     }
@@ -96,7 +96,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.clearAppData(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg 数据已清除" else "清除失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "$pkg data cleared" else "Clear failed: ${result.error}")
             }
         }
     }
@@ -105,7 +105,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.disableApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg 已禁用" else "禁用失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "$pkg disabled" else "Disable failed: ${result.error}")
             }
         }
     }
@@ -114,17 +114,17 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.enableApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg 已启用" else "启用失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "$pkg enabled" else "Enable failed: ${result.error}")
             }
         }
     }
 
     fun backup(pkg: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "正在备份 $pkg...") }
+            _uiState.update { it.copy(statusMessage = "Backing up $pkg...") }
             val result = AdbService.backupApp(pkg, "/sdcard/Download/${pkg}.apk")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "已备份到 /sdcard/Download/${pkg}.apk" else "备份失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Backed up to /sdcard/Download/${pkg}.apk" else "Backup failed: ${result.error}")
             }
         }
     }
@@ -133,7 +133,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.launchApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg 已启动" else "启动失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "$pkg launched" else "Launch failed: ${result.error}")
             }
         }
     }

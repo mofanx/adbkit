@@ -32,14 +32,14 @@ sealed class Screen(
     object AppManager : Screen(Routes.APP_MANAGER, "应用管理", Icons.Outlined.Apps, Icons.Filled.Apps)
     object ProcessManager : Screen(Routes.PROCESS_MANAGER, "进程管理", Icons.Outlined.Memory, Icons.Filled.Memory)
     object Terminal : Screen(Routes.TERMINAL, "运行命令", Icons.Outlined.Code, Icons.Filled.Code)
-    object Fastboot : Screen(Routes.FASTBOOT, "Fastboot", Icons.Outlined.Star, Icons.Filled.Star)
+    object Fastboot : Screen(Routes.FASTBOOT, "Fastboot", Icons.Outlined.FlashOn, Icons.Filled.FlashOn)
     object Settings : Screen(Routes.SETTINGS, "设置", Icons.Outlined.Settings, Icons.Filled.Settings)
 
     companion object {
         val drawerScreens: List<Screen>
             get() = listOf(
                 Home, DeviceInfo, Tools, RemoteControl,
-                FileManager, AppManager, ProcessManager, Terminal, Fastboot
+                FileManager, AppManager, ProcessManager, Terminal
             )
     }
 }

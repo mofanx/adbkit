@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.ProcessManagerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -23,22 +24,23 @@ fun ProcessManagerScreen(
     viewModel: ProcessManagerViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("进程管理") },
+                title = { Text(strings.screenProcessManager) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                        Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
                     }
                     IconButton(onClick = { viewModel.toggleSearch() }) {
-                        Icon(Icons.Filled.Search, contentDescription = "搜索")
+                        Icon(Icons.Filled.Search, contentDescription = strings.search)
                     }
                 }
             )
@@ -57,7 +59,7 @@ fun ProcessManagerScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    placeholder = { Text("搜索进程...") },
+                    placeholder = { Text(strings.searchProcess) },
                     leadingIcon = { Icon(Icons.Filled.Search, null) },
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
@@ -73,7 +75,7 @@ fun ProcessManagerScreen(
 
             // Process count
             Text(
-                text = "共 ${uiState.filteredProcesses.size} 个进程",
+                text = strings.totalProcesses(uiState.filteredProcesses.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -86,11 +88,11 @@ fun ProcessManagerScreen(
                     .padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("PID", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                Text(strings.pid, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(60.dp))
-                Text("内存", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                Text(strings.memory, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(60.dp))
-                Text("进程名", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                Text(strings.processName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(48.dp))
             }
@@ -115,7 +117,7 @@ fun ProcessManagerScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(uiState.error, color = MaterialTheme.colorScheme.error)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.refresh() }) { Text("重试") }
+                        Button(onClick = { viewModel.refresh() }) { Text(strings.retry) }
                     }
                 }
             } else {
@@ -166,7 +168,7 @@ fun ProcessRow(
         IconButton(onClick = onKill, modifier = Modifier.size(32.dp)) {
             Icon(
                 Icons.Filled.Close,
-                contentDescription = "结束进程",
+                contentDescription = LocalStrings.current.killProcess,
                 tint = MaterialTheme.colorScheme.error,
                 modifier = Modifier.size(16.dp)
             )

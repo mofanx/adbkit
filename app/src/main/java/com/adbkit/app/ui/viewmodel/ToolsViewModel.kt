@@ -24,7 +24,7 @@ class ToolsViewModel : ViewModel() {
         when (action) {
             "screenshot" -> takeScreenshot()
             "screenrecord" -> startScreenRecord()
-            "install" -> _uiState.update { it.copy(statusMessage = "请通过文件管理器选择APK文件安装") }
+            "install" -> _uiState.update { it.copy(statusMessage = "Please select APK via file manager") }
             "reboot" -> _uiState.update { it.copy(activeDialog = "reboot") }
             "input_text" -> _uiState.update { it.copy(activeDialog = "input_text") }
             "key_event" -> _uiState.update { it.copy(activeDialog = "key_event") }
@@ -55,30 +55,30 @@ class ToolsViewModel : ViewModel() {
 
     private fun takeScreenshot() {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "正在截图...") }
+            _uiState.update { it.copy(statusMessage = "Taking screenshot...") }
             val result = AdbService.shell("screencap -p /sdcard/screenshot_adbkit.png")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "截图已保存到 /sdcard/screenshot_adbkit.png" else "截图失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Screenshot saved to /sdcard/screenshot_adbkit.png" else "Screenshot failed: ${result.error}")
             }
         }
     }
 
     private fun startScreenRecord() {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "开始录屏 (最长3分钟)...") }
+            _uiState.update { it.copy(statusMessage = "Recording (max 3min)...") }
             val result = AdbService.shell("screenrecord --time-limit 180 /sdcard/screenrecord_adbkit.mp4 &")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "录屏中... 文件: /sdcard/screenrecord_adbkit.mp4" else "录屏失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Recording... File: /sdcard/screenrecord_adbkit.mp4" else "Record failed: ${result.error}")
             }
         }
     }
 
     fun reboot(mode: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(activeDialog = "", statusMessage = "正在重启...") }
+            _uiState.update { it.copy(activeDialog = "", statusMessage = "Rebooting...") }
             val result = AdbService.reboot(mode)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "重启命令已发送" else "重启失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Reboot command sent" else "Reboot failed: ${result.error}")
             }
         }
     }
@@ -88,7 +88,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.inputText(text)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "文本已输入" else "输入失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Text sent" else "Input failed: ${result.error}")
             }
         }
     }
@@ -97,7 +97,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.inputKeyEvent(code)
             if (!result.success) {
-                _uiState.update { it.copy(statusMessage = "按键失败: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = "Key event failed: ${result.error}") }
             }
         }
     }
@@ -107,7 +107,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.setScreenBrightness(value)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "亮度已设置为 $value" else "设置失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Brightness set to $value" else "Set failed: ${result.error}")
             }
         }
     }
@@ -116,7 +116,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.setScreenTimeout(300000) // 5 minutes
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "屏幕超时已设为5分钟" else "设置失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Screen timeout set to 5min" else "Set failed: ${result.error}")
             }
         }
     }
@@ -127,7 +127,7 @@ class ToolsViewModel : ViewModel() {
             val enable = status.output.contains("disabled", ignoreCase = true)
             val result = AdbService.toggleWifi(enable)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "WiFi已${if (enable) "开启" else "关闭"}" else "操作失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "WiFi ${if (enable) "ON" else "OFF"}" else "Failed: ${result.error}")
             }
         }
     }
@@ -136,7 +136,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.toggleBluetooth(true)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "蓝牙操作已执行" else "操作失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Bluetooth toggled" else "Failed: ${result.error}")
             }
         }
     }
@@ -145,7 +145,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.toggleAirplaneMode(true)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "飞行模式操作已执行" else "操作失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Airplane mode toggled" else "Failed: ${result.error}")
             }
         }
     }
@@ -155,7 +155,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.openUrl(url)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "已打开链接" else "打开失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "URL opened" else "Open failed: ${result.error}")
             }
         }
     }
@@ -165,7 +165,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.launchApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "应用已启动" else "启动失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "App launched" else "Launch failed: ${result.error}")
             }
         }
     }
@@ -174,7 +174,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.dumpActivity()
             _uiState.update {
-                it.copy(statusMessage = if (result.success) result.output else "获取失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) result.output else "Failed: ${result.error}")
             }
         }
     }
@@ -185,7 +185,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     activeDialog = "logcat_view",
-                    commandOutput = if (result.success) result.output else "获取失败: ${result.error}"
+                    commandOutput = if (result.success) result.output else "Failed: ${result.error}"
                 )
             }
         }
@@ -194,7 +194,7 @@ class ToolsViewModel : ViewModel() {
     fun clearLogcat() {
         viewModelScope.launch {
             AdbService.clearLogcat()
-            _uiState.update { it.copy(commandOutput = "日志已清除") }
+            _uiState.update { it.copy(commandOutput = "Log cleared") }
         }
     }
 
@@ -204,7 +204,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     activeDialog = "logcat_view",
-                    commandOutput = if (result.success) result.output else "获取失败: ${result.error}"
+                    commandOutput = if (result.success) result.output else "Failed: ${result.error}"
                 )
             }
         }
@@ -219,7 +219,7 @@ class ToolsViewModel : ViewModel() {
                 AdbService.shell("wm density $dpi")
             }
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "屏幕密度已修改" else "修改失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Density changed" else "Change failed: ${result.error}")
             }
         }
     }
@@ -233,7 +233,7 @@ class ToolsViewModel : ViewModel() {
                 AdbService.shell("wm size $res")
             }
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "分辨率已修改" else "修改失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Resolution changed" else "Change failed: ${result.error}")
             }
         }
     }
@@ -242,7 +242,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.shell("settings put global policy_control immersive.navigation=*")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "导航栏已隐藏" else "操作失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Navigation bar hidden" else "Failed: ${result.error}")
             }
         }
     }
@@ -251,7 +251,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.shell("settings put global policy_control immersive.status=*")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "状态栏已隐藏" else "操作失败: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Status bar hidden" else "Failed: ${result.error}")
             }
         }
     }

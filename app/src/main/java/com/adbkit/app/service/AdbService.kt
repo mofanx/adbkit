@@ -113,18 +113,18 @@ object AdbService {
 
     suspend fun getDeviceInfo(): Map<String, String> {
         val props = mapOf(
-            "型号" to "ro.product.model",
-            "品牌" to "ro.product.brand",
-            "设备名" to "ro.product.device",
-            "Android版本" to "ro.build.version.release",
-            "SDK版本" to "ro.build.version.sdk",
-            "Build ID" to "ro.build.display.id",
-            "序列号" to "ro.serialno",
-            "硬件" to "ro.hardware",
-            "CPU架构" to "ro.product.cpu.abi",
-            "安全补丁" to "ro.build.version.security_patch",
-            "基带版本" to "gsm.version.baseband",
-            "内核版本" to "os.version"
+            "model" to "ro.product.model",
+            "brand" to "ro.product.brand",
+            "device_name" to "ro.product.device",
+            "android_version" to "ro.build.version.release",
+            "sdk_version" to "ro.build.version.sdk",
+            "build_id" to "ro.build.display.id",
+            "serial" to "ro.serialno",
+            "hardware" to "ro.hardware",
+            "cpu_arch" to "ro.product.cpu.abi",
+            "security_patch" to "ro.build.version.security_patch",
+            "baseband" to "gsm.version.baseband",
+            "kernel" to "os.version"
         )
         val result = mutableMapOf<String, String>()
         for ((label, prop) in props) {
@@ -132,30 +132,24 @@ object AdbService {
         }
         // Extra info via shell commands
         val screenSize = shell("wm size")
-        if (screenSize.success) result["屏幕分辨率"] = screenSize.output.replace("Physical size: ", "")
+        if (screenSize.success) result["screen_resolution"] = screenSize.output.replace("Physical size: ", "")
 
         val density = shell("wm density")
-        if (density.success) result["屏幕密度"] = density.output.replace("Physical density: ", "")
+        if (density.success) result["screen_density"] = density.output.replace("Physical density: ", "")
 
         val battery = shell("dumpsys battery")
         if (battery.success) {
             battery.output.lines().forEach { line ->
                 val trimmed = line.trim()
                 when {
-                    trimmed.startsWith("level:") -> result["电池电量"] = "${trimmed.substringAfter(":").trim()}%"
+                    trimmed.startsWith("level:") -> result["battery_level"] = "${trimmed.substringAfter(":").trim()}%"
                     trimmed.startsWith("temperature:") -> {
                         val temp = trimmed.substringAfter(":").trim().toIntOrNull()
-                        if (temp != null) result["电池温度"] = "${temp / 10.0}°C"
+                        if (temp != null) result["battery_temp"] = "${temp / 10.0}°C"
                     }
                     trimmed.startsWith("status:") -> {
-                        val status = when (trimmed.substringAfter(":").trim()) {
-                            "2" -> "充电中"
-                            "3" -> "放电中"
-                            "4" -> "未充电"
-                            "5" -> "已充满"
-                            else -> "未知"
-                        }
-                        result["电池状态"] = status
+                        val status = trimmed.substringAfter(":").trim()
+                        result["battery_status"] = status
                     }
                 }
             }
@@ -168,11 +162,11 @@ object AdbService {
             val availLine = lines.find { it.startsWith("MemAvailable:") }
             totalLine?.let {
                 val kb = it.replace("MemTotal:", "").replace("kB", "").trim().toLongOrNull()
-                if (kb != null) result["总内存"] = "${kb / 1024}MB"
+                if (kb != null) result["total_memory"] = "${kb / 1024}MB"
             }
             availLine?.let {
                 val kb = it.replace("MemAvailable:", "").replace("kB", "").trim().toLongOrNull()
-                if (kb != null) result["可用内存"] = "${kb / 1024}MB"
+                if (kb != null) result["available_memory"] = "${kb / 1024}MB"
             }
         }
 
@@ -182,25 +176,25 @@ object AdbService {
             dataLine?.let {
                 val parts = it.split("\\s+".toRegex())
                 if (parts.size >= 4) {
-                    result["存储总量"] = parts[1]
-                    result["存储可用"] = parts[3]
+                    result["total_storage"] = parts[1]
+                    result["available_storage"] = parts[3]
                 }
             }
         }
 
         val uptimeResult = shell("uptime")
-        if (uptimeResult.success) result["运行时间"] = uptimeResult.output.trim()
+        if (uptimeResult.success) result["uptime"] = uptimeResult.output.trim()
 
         val ipResult = shell("ip route | grep 'src'")
         if (ipResult.success) {
             val ip = ipResult.output.lines().firstOrNull()?.let { line ->
                 "src\\s+(\\S+)".toRegex().find(line)?.groupValues?.getOrNull(1)
             }
-            if (ip != null) result["IP地址"] = ip
+            if (ip != null) result["ip_address"] = ip
         }
 
         val wifiMac = shell("cat /sys/class/net/wlan0/address")
-        if (wifiMac.success) result["WiFi MAC"] = wifiMac.output.trim()
+        if (wifiMac.success) result["wifi_mac"] = wifiMac.output.trim()
 
         return result
     }
@@ -262,14 +256,14 @@ object AdbService {
             dump.output.lines().forEach { line ->
                 val trimmed = line.trim()
                 when {
-                    trimmed.startsWith("versionName=") -> info["版本名"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("versionCode=") -> info["版本号"] = trimmed.substringAfter("=").split(" ")[0]
-                    trimmed.startsWith("firstInstallTime=") -> info["安装时间"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("lastUpdateTime=") -> info["更新时间"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("codePath=") -> info["APK路径"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("dataDir=") -> info["数据目录"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("targetSdk=") -> info["目标SDK"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("minSdk=") -> info["最低SDK"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("versionName=") -> info["version_name"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("versionCode=") -> info["version_code"] = trimmed.substringAfter("=").split(" ")[0]
+                    trimmed.startsWith("firstInstallTime=") -> info["install_time"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("lastUpdateTime=") -> info["update_time"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("codePath=") -> info["apk_path"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("dataDir=") -> info["data_dir"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("targetSdk=") -> info["target_sdk"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("minSdk=") -> info["min_sdk"] = trimmed.substringAfter("=")
                 }
             }
         }

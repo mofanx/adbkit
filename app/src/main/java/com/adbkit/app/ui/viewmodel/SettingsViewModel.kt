@@ -18,6 +18,7 @@ data class SettingsUiState(
     val keepScreenOn: Boolean = false,
     val confirmDangerous: Boolean = true,
     val saveHistory: Boolean = true,
+    val language: String = "zh",
     val adbStatus: String = "",
     val isCheckingAdb: Boolean = false
 )
@@ -37,6 +38,7 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.keepScreenOn.collect { v -> _uiState.update { it.copy(keepScreenOn = v) } } }
         viewModelScope.launch { repo.confirmDangerous.collect { v -> _uiState.update { it.copy(confirmDangerous = v) } } }
         viewModelScope.launch { repo.saveHistory.collect { v -> _uiState.update { it.copy(saveHistory = v) } } }
+        viewModelScope.launch { repo.language.collect { v -> _uiState.update { it.copy(language = v) } } }
     }
 
     fun setAdbPath(path: String) {
@@ -87,25 +89,31 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setSaveHistory(value) }
     }
 
+    fun setLanguage(lang: String) {
+        _uiState.update { it.copy(language = lang) }
+        viewModelScope.launch { repo.setLanguage(lang) }
+    }
+
     fun checkAdbAvailability() {
-        _uiState.update { it.copy(isCheckingAdb = true, adbStatus = "检测中...") }
+        _uiState.update { it.copy(isCheckingAdb = true, adbStatus = "") }
         viewModelScope.launch {
             val path = _uiState.value.adbPath
             val result = AdbService.executeCommand("$path version")
             val status = if (result.success) {
-                "✓ ADB 可用: ${result.output.lines().firstOrNull() ?: ""}"
+                "✓ ADB OK: ${result.output.lines().firstOrNull() ?: ""}"
             } else {
-                "✗ ADB 不可用: ${result.error.ifEmpty { "未找到adb" }}"
+                "✗ ADB Error: ${result.error.ifEmpty { "not found" }}"
             }
             _uiState.update { it.copy(isCheckingAdb = false, adbStatus = status) }
         }
     }
 
     fun autoDetectAdb() {
-        _uiState.update { it.copy(isCheckingAdb = true, adbStatus = "自动检测中...") }
+        _uiState.update { it.copy(isCheckingAdb = true, adbStatus = "") }
         viewModelScope.launch {
             val candidatePaths = listOf(
                 "adb",
+                "${AdbKitApplication.instance.filesDir.absolutePath}/bin/adb",
                 "/data/local/tmp/adb",
                 "${AdbKitApplication.instance.filesDir.absolutePath}/adb",
                 "/system/bin/adb",
@@ -121,7 +129,7 @@ class SettingsViewModel : ViewModel() {
                     _uiState.update {
                         it.copy(
                             isCheckingAdb = false,
-                            adbStatus = "✓ 已找到: $candidate\n${result.output.lines().firstOrNull() ?: ""}"
+                            adbStatus = "✓ Found: $candidate\n${result.output.lines().firstOrNull() ?: ""}"
                         )
                     }
                     found = true
@@ -132,10 +140,7 @@ class SettingsViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isCheckingAdb = false,
-                        adbStatus = "✗ 未找到可用的adb\n\n请手动放置adb到以下路径之一:\n" +
-                                "• ${AdbKitApplication.instance.filesDir.absolutePath}/adb\n" +
-                                "• /data/local/tmp/adb\n\n" +
-                                "或在上方手动指定adb路径"
+                        adbStatus = "✗ No ADB found"
                     )
                 }
             }

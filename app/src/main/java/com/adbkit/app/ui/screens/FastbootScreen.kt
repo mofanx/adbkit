@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FastbootViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,19 +27,20 @@ fun FastbootScreen(
     viewModel: FastbootViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fastboot") },
+                title = { Text(strings.screenFastboot) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.checkDevices() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "检测设备")
+                        Icon(Icons.Filled.Refresh, contentDescription = strings.detectDevice)
                     }
                 }
             )
@@ -77,7 +79,7 @@ fun FastbootScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = if (uiState.deviceDetected) "Fastboot 设备已连接" else "请插入设备",
+                        text = if (uiState.deviceDetected) strings.fastbootDeviceConnected else strings.fastbootInsertDevice,
                         color = if (uiState.deviceDetected)
                             MaterialTheme.colorScheme.onPrimaryContainer
                         else MaterialTheme.colorScheme.onErrorContainer
@@ -92,7 +94,7 @@ fun FastbootScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "刷入镜像",
+                        strings.flashImage,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -103,11 +105,11 @@ fun FastbootScreen(
                     OutlinedTextField(
                         value = uiState.imagePath,
                         onValueChange = { viewModel.setImagePath(it) },
-                        label = { Text("镜像文件路径") },
+                        label = { Text(strings.imageFilePath) },
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
                             IconButton(onClick = { /* File picker */ }) {
-                                Icon(Icons.Filled.Folder, "选择文件",
+                                Icon(Icons.Filled.Folder, strings.selectFile,
                                     tint = MaterialTheme.colorScheme.primary)
                             }
                         },
@@ -122,7 +124,7 @@ fun FastbootScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("分区:", style = MaterialTheme.typography.bodyMedium)
+                        Text("${strings.partition}:", style = MaterialTheme.typography.bodyMedium)
 
                         var expanded by remember { mutableStateOf(false) }
                         Box {
@@ -150,7 +152,7 @@ fun FastbootScreen(
                             onClick = { viewModel.flashImage() },
                             enabled = uiState.imagePath.isNotBlank()
                         ) {
-                            Text("刷入")
+                            Text(strings.flash)
                         }
                     }
                 }
@@ -163,7 +165,7 @@ fun FastbootScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "快捷操作",
+                        strings.quickActions,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -177,11 +179,11 @@ fun FastbootScreen(
                         OutlinedButton(
                             onClick = { viewModel.fastbootReboot("") },
                             modifier = Modifier.weight(1f)
-                        ) { Text("重启系统") }
+                        ) { Text(strings.rebootSystem) }
                         OutlinedButton(
                             onClick = { viewModel.fastbootReboot("bootloader") },
                             modifier = Modifier.weight(1f)
-                        ) { Text("重启BL") }
+                        ) { Text(strings.rebootBl) }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
@@ -191,11 +193,11 @@ fun FastbootScreen(
                         OutlinedButton(
                             onClick = { viewModel.fastbootReboot("recovery") },
                             modifier = Modifier.weight(1f)
-                        ) { Text("重启Recovery") }
+                        ) { Text(strings.rebootRecovery) }
                         OutlinedButton(
                             onClick = { viewModel.fastbootReboot("fastboot") },
                             modifier = Modifier.weight(1f)
-                        ) { Text("重启Fastbootd") }
+                        ) { Text(strings.rebootFastbootd) }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
@@ -208,14 +210,14 @@ fun FastbootScreen(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
-                        ) { Text("解锁BL") }
+                        ) { Text(strings.unlockBl) }
                         OutlinedButton(
                             onClick = { viewModel.lockBootloader() },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
-                        ) { Text("锁定BL") }
+                        ) { Text(strings.lockBl) }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
@@ -228,11 +230,11 @@ fun FastbootScreen(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
-                        ) { Text("擦除分区") }
+                        ) { Text(strings.erasePartition) }
                         OutlinedButton(
                             onClick = { viewModel.getVar() },
                             modifier = Modifier.weight(1f)
-                        ) { Text("设备变量") }
+                        ) { Text(strings.deviceVariables) }
                     }
                 }
             }
@@ -244,7 +246,7 @@ fun FastbootScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "自定义命令",
+                        strings.customCommand,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -267,7 +269,7 @@ fun FastbootScreen(
                             onClick = { viewModel.executeCustomCommand() },
                             enabled = uiState.customCommand.isNotBlank()
                         ) {
-                            Text("执行")
+                            Text(strings.execute)
                         }
                     }
                 }
@@ -285,13 +287,13 @@ fun FastbootScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "命令行输出",
+                            strings.commandOutput,
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                         IconButton(onClick = { viewModel.clearOutput() }) {
-                            Icon(Icons.Filled.DeleteSweep, "清除")
+                            Icon(Icons.Filled.DeleteSweep, strings.clear)
                         }
                     }
 

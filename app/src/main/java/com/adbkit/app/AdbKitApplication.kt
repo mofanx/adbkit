@@ -1,7 +1,9 @@
 package com.adbkit.app
 
 import android.app.Application
+import android.util.Log
 import com.adbkit.app.data.SettingsRepository
+import com.adbkit.app.service.AdbBinaryManager
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,11 +23,26 @@ class AdbKitApplication : Application() {
 
     private fun initAdbPath() {
         appScope.launch(Dispatchers.IO) {
+            // 1. Try to extract bundled binary first
+            try {
+                val (adbPath, fastbootPath) = AdbBinaryManager.setup(instance)
+                AdbService.setAdbPath(adbPath)
+                AdbService.setFastbootPath(fastbootPath)
+                Log.i("AdbKit", "Bundled ADB: $adbPath")
+            } catch (e: Exception) {
+                Log.w("AdbKit", "Bundled ADB setup failed: ${e.message}")
+            }
+
+            // 2. Override with user-saved path if explicitly set
             val repo = SettingsRepository(instance)
             val savedPath = repo.adbPath.first()
-            AdbService.setAdbPath(savedPath)
+            if (savedPath != "adb" && savedPath.isNotBlank()) {
+                AdbService.setAdbPath(savedPath)
+            }
             val savedFastboot = repo.fastbootPath.first()
-            AdbService.setFastbootPath(savedFastboot)
+            if (savedFastboot != "fastboot" && savedFastboot.isNotBlank()) {
+                AdbService.setFastbootPath(savedFastboot)
+            }
         }
     }
 

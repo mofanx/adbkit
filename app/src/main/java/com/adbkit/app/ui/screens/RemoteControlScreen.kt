@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.RemoteControlViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +55,7 @@ private fun ScreenMirrorView(
     onMenuClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var dragStart by remember { mutableStateOf(Offset.Zero) }
     var showControls by remember { mutableStateOf(true) }
@@ -63,26 +65,26 @@ private fun ScreenMirrorView(
             if (showControls) {
                 TopAppBar(
                     title = {
-                        Text("远程控制 - ${uiState.fps}fps", style = MaterialTheme.typography.titleSmall)
+                        Text("${strings.remoteControl} - ${uiState.fps}fps", style = MaterialTheme.typography.titleSmall)
                     },
                     navigationIcon = {
                         IconButton(onClick = onMenuClick) {
-                            Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                            Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                         }
                     },
                     actions = {
                         IconButton(onClick = { showControls = false }) {
-                            Icon(Icons.Filled.Fullscreen, contentDescription = "全屏")
+                            Icon(Icons.Filled.Fullscreen, contentDescription = strings.fullscreen)
                         }
                         IconButton(onClick = { viewModel.startRemoteControl() }) {
-                            Icon(Icons.Filled.LinkOff, contentDescription = "断开")
+                            Icon(Icons.Filled.LinkOff, contentDescription = strings.disconnect)
                         }
                     }
                 )
             }
         },
         bottomBar = {
-            if (showControls && uiState.navBarPosition != "隐藏") {
+            if (showControls && uiState.navBarPosition != "hidden") {
                 Surface(tonalElevation = 3.dp) {
                     Row(
                         modifier = Modifier
@@ -94,26 +96,26 @@ private fun ScreenMirrorView(
                         FilledTonalButton(onClick = { viewModel.sendKey(4) }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("返回")
+                            Text(strings.btnBack)
                         }
                         FilledTonalButton(onClick = { viewModel.sendKey(3) }) {
                             Icon(Icons.Filled.Home, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("主页")
+                            Text(strings.btnHome)
                         }
                         FilledTonalButton(onClick = { viewModel.sendKey(187) }) {
                             Icon(Icons.AutoMirrored.Filled.ViewList, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("最近")
+                            Text(strings.btnRecent)
                         }
                         IconButton(onClick = { viewModel.sendKey(25) }) {
-                            Icon(Icons.AutoMirrored.Filled.VolumeDown, "音量-")
+                            Icon(Icons.AutoMirrored.Filled.VolumeDown, strings.keyVolDown)
                         }
                         IconButton(onClick = { viewModel.sendKey(24) }) {
-                            Icon(Icons.AutoMirrored.Filled.VolumeUp, "音量+")
+                            Icon(Icons.AutoMirrored.Filled.VolumeUp, strings.keyVolUp)
                         }
                         IconButton(onClick = { viewModel.sendKey(26) }) {
-                            Icon(Icons.Filled.PowerSettingsNew, "电源")
+                            Icon(Icons.Filled.PowerSettingsNew, strings.keyPower)
                         }
                     }
                 }
@@ -131,7 +133,7 @@ private fun ScreenMirrorView(
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "远程屏幕",
+                    contentDescription = strings.remoteControl,
                     modifier = Modifier
                         .fillMaxSize()
                         .onSizeChanged { viewSize = it }
@@ -172,14 +174,14 @@ private fun ScreenMirrorView(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = Color.White)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("正在获取画面...", color = Color.White)
+                    Text(strings.gettingScreen, color = Color.White)
                 }
             }
 
             // FPS overlay
             if (!showControls) {
                 Text(
-                    text = "${uiState.fps} fps | 长按显示控制栏",
+                    text = strings.fpsOverlay(uiState.fps),
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 10.sp,
                     modifier = Modifier
@@ -200,14 +202,15 @@ private fun SettingsView(
     onMenuClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("远程控制") },
+                title = { Text(strings.screenRemoteControl) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 }
             )
@@ -228,51 +231,64 @@ private fun SettingsView(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingRow(
-                        label = "刷新率",
+                        label = strings.refreshRate,
                         value = when (uiState.refreshInterval) {
-                            500L -> "低 (2fps)"
-                            200L -> "中 (5fps)"
-                            100L -> "高 (10fps)"
-                            50L -> "极高 (20fps)"
-                            else -> "中 (5fps)"
+                            500L -> strings.refreshRateLow
+                            200L -> strings.refreshRateMid
+                            100L -> strings.refreshRateHigh
+                            50L -> strings.refreshRateUltra
+                            else -> strings.refreshRateMid
                         },
-                        options = listOf("低 (2fps)", "中 (5fps)", "高 (10fps)", "极高 (20fps)"),
+                        options = listOf(strings.refreshRateLow, strings.refreshRateMid, strings.refreshRateHigh, strings.refreshRateUltra),
                         onValueChange = { viewModel.setRefreshRate(it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+                    val aspectMap = mapOf(
+                        "original" to strings.keepOriginal,
+                        "16:9" to "16:9",
+                        "4:3" to "4:3",
+                        "adaptive" to strings.adaptive
+                    )
+                    val aspectReverseMap = aspectMap.entries.associate { (k, v) -> v to k }
                     SettingRow(
-                        label = "画面比例",
-                        value = uiState.aspectRatio,
-                        options = listOf("保持原始比例", "16:9", "4:3", "自适应"),
-                        onValueChange = { viewModel.setAspectRatio(it) }
+                        label = strings.aspectRatio,
+                        value = aspectMap[uiState.aspectRatio] ?: uiState.aspectRatio,
+                        options = aspectMap.values.toList(),
+                        onValueChange = { viewModel.setAspectRatio(aspectReverseMap[it] ?: it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+                    val navMap = mapOf(
+                        "floating" to strings.floating,
+                        "bottom" to strings.bottom,
+                        "hidden" to strings.hidden
+                    )
+                    val navReverseMap = navMap.entries.associate { (k, v) -> v to k }
                     SettingRow(
-                        label = "导航栏位置",
-                        value = uiState.navBarPosition,
-                        options = listOf("悬浮", "底部", "隐藏"),
-                        onValueChange = { viewModel.setNavBarPosition(it) }
+                        label = strings.navBarPosition,
+                        value = navMap[uiState.navBarPosition] ?: uiState.navBarPosition,
+                        options = navMap.values.toList(),
+                        onValueChange = { viewModel.setNavBarPosition(navReverseMap[it] ?: it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                     ToggleRow(
-                        label = "全屏显示",
+                        label = strings.fullscreenDisplay,
                         checked = uiState.fullscreen,
                         onCheckedChange = { viewModel.setFullscreen(it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                     ToggleRow(
-                        label = "熄屏控制",
+                        label = strings.screenOffControl,
                         checked = uiState.screenOff,
                         onCheckedChange = { viewModel.setScreenOff(it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                     ToggleRow(
-                        label = "兼容模式",
+                        label = strings.compatMode,
                         checked = uiState.compatMode,
                         onCheckedChange = { viewModel.setCompatMode(it) }
                     )
@@ -286,13 +302,13 @@ private fun SettingsView(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("使用说明", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(strings.usageGuide, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("• 点击屏幕画面即可操作远程设备", style = MaterialTheme.typography.bodySmall)
-                    Text("• 滑动画面可模拟滑动操作", style = MaterialTheme.typography.bodySmall)
-                    Text("• 长按画面可切换控制栏显示", style = MaterialTheme.typography.bodySmall)
-                    Text("• 底部导航栏提供返回/主页/最近任务等快捷键", style = MaterialTheme.typography.bodySmall)
-                    Text("• 刷新率越高越流畅，但消耗更多资源", style = MaterialTheme.typography.bodySmall)
+                    Text(strings.usageTip1, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.usageTip2, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.usageTip3, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.usageTip4, style = MaterialTheme.typography.bodySmall)
+                    Text(strings.usageTip5, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -313,7 +329,7 @@ private fun SettingsView(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                Text("连接", style = MaterialTheme.typography.bodyLarge)
+                Text(strings.connect, style = MaterialTheme.typography.bodyLarge)
             }
 
             // Status

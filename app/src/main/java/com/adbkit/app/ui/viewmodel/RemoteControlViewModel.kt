@@ -14,10 +14,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class RemoteControlUiState(
-    val resolution: String = "自动调整",
+    val resolution: String = "auto",
     val bitrate: String = "8Mbps",
-    val aspectRatio: String = "保持原始比例",
-    val navBarPosition: String = "悬浮",
+    val aspectRatio: String = "original",
+    val navBarPosition: String = "floating",
     val fullscreen: Boolean = false,
     val screenOff: Boolean = false,
     val compatMode: Boolean = false,
@@ -71,11 +71,11 @@ class RemoteControlViewModel : ViewModel() {
     fun setCompatMode(value: Boolean) { _uiState.update { it.copy(compatMode = value) } }
 
     fun setRefreshRate(rate: String) {
-        val interval = when (rate) {
-            "低 (2fps)" -> 500L
-            "中 (5fps)" -> 200L
-            "高 (10fps)" -> 100L
-            "极高 (20fps)" -> 50L
+        val interval = when {
+            rate.contains("2fps") -> 500L
+            rate.contains("5fps") -> 200L
+            rate.contains("10fps") -> 100L
+            rate.contains("20fps") -> 50L
             else -> 200L
         }
         _uiState.update { it.copy(refreshInterval = interval) }
@@ -84,14 +84,14 @@ class RemoteControlViewModel : ViewModel() {
     fun startRemoteControl() {
         if (_uiState.value.isConnected) {
             stopCapture()
-            _uiState.update { it.copy(isConnected = false, statusMessage = "已断开远程控制", screenBitmap = null) }
+            _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected", screenBitmap = null) }
             return
         }
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(statusMessage = "请先连接设备", isError = true) }
+            _uiState.update { it.copy(statusMessage = "No device connected", isError = true) }
             return
         }
-        _uiState.update { it.copy(isConnecting = true, statusMessage = "正在连接...") }
+        _uiState.update { it.copy(isConnecting = true, statusMessage = "Connecting...") }
         viewModelScope.launch {
             val result = AdbService.shell("echo connected")
             if (result.success) {
@@ -103,7 +103,7 @@ class RemoteControlViewModel : ViewModel() {
                     it.copy(
                         isConnecting = false,
                         isConnected = true,
-                        statusMessage = "远程控制已连接 - 实时投屏中",
+                        statusMessage = "Remote control connected",
                         isError = false
                     )
                 }
@@ -112,7 +112,7 @@ class RemoteControlViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
-                        statusMessage = "连接失败: ${result.error}",
+                        statusMessage = "Connection failed: ${result.error}",
                         isError = true
                     )
                 }

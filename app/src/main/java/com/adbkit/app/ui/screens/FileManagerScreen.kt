@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FileManagerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,25 +26,26 @@ fun FileManagerScreen(
     viewModel: FileManagerViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val strings = LocalStrings.current
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("文件管理") },
+                title = { Text(strings.screenFileManager) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "菜单")
+                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "刷新")
+                        Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
                     }
                     IconButton(onClick = { viewModel.showCreateDirDialog() }) {
-                        Icon(Icons.Filled.CreateNewFolder, contentDescription = "新建文件夹")
+                        Icon(Icons.Filled.CreateNewFolder, contentDescription = strings.newFolder)
                     }
                     IconButton(onClick = { viewModel.navigateToHome() }) {
-                        Icon(Icons.Filled.Home, contentDescription = "主目录")
+                        Icon(Icons.Filled.Home, contentDescription = strings.homeDir)
                     }
                 }
             )
@@ -70,7 +72,7 @@ fun FileManagerScreen(
                         onClick = { viewModel.navigateUp() },
                         enabled = uiState.currentPath != "/"
                     ) {
-                        Icon(Icons.Filled.ArrowUpward, contentDescription = "上级目录")
+                        Icon(Icons.Filled.ArrowUpward, contentDescription = strings.parentDir)
                     }
                     Text(
                         text = uiState.currentPath,
@@ -91,11 +93,11 @@ fun FileManagerScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(
-                    "/sdcard" to "SD卡",
-                    "/sdcard/Download" to "下载",
-                    "/sdcard/DCIM" to "相册",
-                    "/data" to "数据",
-                    "/" to "根目录"
+                    "/sdcard" to strings.sdCard,
+                    "/sdcard/Download" to strings.download,
+                    "/sdcard/DCIM" to strings.album,
+                    "/data" to strings.data,
+                    "/" to strings.rootDir
                 ).forEach { (path, label) ->
                     AssistChip(
                         onClick = { viewModel.navigateTo(path) },
@@ -149,7 +151,7 @@ fun FileManagerScreen(
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("空目录", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(strings.emptyDir, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -162,20 +164,20 @@ fun FileManagerScreen(
             var dirName by remember { mutableStateOf("") }
             AlertDialog(
                 onDismissRequest = { viewModel.hideCreateDirDialog() },
-                title = { Text("新建文件夹") },
+                title = { Text(strings.newFolder) },
                 text = {
                     OutlinedTextField(
                         value = dirName,
                         onValueChange = { dirName = it },
-                        label = { Text("文件夹名称") },
+                        label = { Text(strings.folderName) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { viewModel.createDirectory(dirName) }) { Text("创建") }
+                    TextButton(onClick = { viewModel.createDirectory(dirName) }) { Text(strings.create) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.hideCreateDirDialog() }) { Text("取消") }
+                    TextButton(onClick = { viewModel.hideCreateDirDialog() }) { Text(strings.cancel) }
                 }
             )
         }
@@ -246,7 +248,7 @@ fun FileItemRow(
 
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                    Icon(Icons.Filled.MoreVert, contentDescription = LocalStrings.current.more)
                 }
                 DropdownMenu(
                     expanded = showMenu,
@@ -254,7 +256,7 @@ fun FileItemRow(
                 ) {
                     if (!isDir) {
                         DropdownMenuItem(
-                            text = { Text("下载到本地") },
+                            text = { Text(LocalStrings.current.downloadToLocal) },
                             onClick = {
                                 showMenu = false
                                 onPull()
@@ -263,7 +265,7 @@ fun FileItemRow(
                         )
                     }
                     DropdownMenuItem(
-                        text = { Text("删除") },
+                        text = { Text(LocalStrings.current.delete) },
                         onClick = {
                             showMenu = false
                             onDelete()
