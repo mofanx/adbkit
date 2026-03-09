@@ -1,5 +1,7 @@
 package com.adbkit.app.service
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -426,6 +428,27 @@ object AdbService {
 
     suspend fun dumpActivity(): CommandResult {
         return shell("dumpsys activity top | grep ACTIVITY")
+    }
+
+    suspend fun captureScreenBitmap(): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val device = currentDevice
+            val cmd = buildString {
+                append("adb")
+                if (device != null) append(" -s $device")
+                append(" exec-out screencap -p")
+            }
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+            val bytes = process.inputStream.readBytes()
+            process.waitFor()
+            if (bytes.size > 100) {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 }
 

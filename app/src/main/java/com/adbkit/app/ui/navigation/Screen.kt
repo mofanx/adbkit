@@ -14,12 +14,12 @@ sealed class Screen(
     data object Home : Screen("home", "连接", Icons.Outlined.Link, Icons.Filled.Link)
     data object DeviceInfo : Screen("device_info", "设备信息", Icons.Outlined.Info, Icons.Filled.Info)
     data object Tools : Screen("tools", "实用工具", Icons.Outlined.Build, Icons.Filled.Build)
-    data object RemoteControl : Screen("remote_control", "远程控制", Icons.Outlined.Mouse, Icons.Filled.Mouse)
+    data object RemoteControl : Screen("remote_control", "远程控制", Icons.Outlined.Phonelink, Icons.Filled.Phonelink)
     data object FileManager : Screen("file_manager", "文件管理", Icons.Outlined.Folder, Icons.Filled.Folder)
     data object AppManager : Screen("app_manager", "应用管理", Icons.Outlined.Apps, Icons.Filled.Apps)
-    data object ProcessManager : Screen("process_manager", "进程管理", Icons.Outlined.PlayCircle, Icons.Filled.PlayCircle)
-    data object Terminal : Screen("terminal", "运行命令", Icons.Outlined.Terminal, Icons.Filled.Terminal)
-    data object Fastboot : Screen("fastboot", "Fastboot", Icons.Outlined.FlashOn, Icons.Filled.FlashOn)
+    data object ProcessManager : Screen("process_manager", "进程管理", Icons.Outlined.Memory, Icons.Filled.Memory)
+    data object Terminal : Screen("terminal", "运行命令", Icons.Outlined.Code, Icons.Filled.Code)
+    data object Fastboot : Screen("fastboot", "Fastboot", Icons.Outlined.OfflineBolt, Icons.Filled.OfflineBolt)
     data object Settings : Screen("settings", "设置", Icons.Outlined.Settings, Icons.Filled.Settings)
 
     companion object {

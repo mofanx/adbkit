@@ -52,7 +52,7 @@ fun TerminalScreen(
                     }
                     IconButton(onClick = { viewModel.toggleShellMode() }) {
                         Icon(
-                            if (uiState.isShellMode) Icons.Filled.Terminal else Icons.Filled.Code,
+                            if (uiState.isShellMode) Icons.Filled.Code else Icons.Filled.Build,
                             contentDescription = "切换模式"
                         )
                     }

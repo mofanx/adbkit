@@ -41,7 +41,7 @@ fun HomeScreen(
                         Icon(Icons.Filled.Link, contentDescription = "配对")
                     }
                     IconButton(onClick = { }) {
-                        Icon(Icons.Filled.FlashOn, contentDescription = "Fastboot")
+                        Icon(Icons.Filled.OfflineBolt, contentDescription = "Fastboot")
                     }
                     IconButton(onClick = { }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "更多")
@@ -61,7 +61,7 @@ fun HomeScreen(
 
             // App Icon
             Icon(
-                imageVector = Icons.Filled.Terminal,
+                imageVector = Icons.Filled.PhoneAndroid,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.primary

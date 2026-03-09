@@ -107,7 +107,7 @@ fun FastbootScreen(
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
                             IconButton(onClick = { /* File picker */ }) {
-                                Icon(Icons.Filled.FolderOpen, "选择文件",
+                                Icon(Icons.Filled.Folder, "选择文件",
                                     tint = MaterialTheme.colorScheme.primary)
                             }
                         },

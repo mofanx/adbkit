@@ -38,7 +38,7 @@ fun AdbKitApp() {
                 ) {
                     Column {
                         Icon(
-                            imageVector = Icons.Filled.Terminal,
+                            imageVector = Icons.Filled.PhoneAndroid,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.primary
