@@ -325,6 +325,9 @@ object ZhStrings : AppStrings {
     override val aboutVersion = "版本"
     override val aboutDeveloper = "开发者"
     override val aboutRepo = "项目地址"
+    override val adbStatusReady = "ADB 已就绪"
+    override val adbStatusNotReady = "ADB 未就绪 - 无法找到ADB可执行文件"
+    override val adbDiagnostics = "诊断信息"
     override val detecting = "检测中..."
     override val autoDetecting = "自动检测中..."
     override val adbAvailable = { info: String -> "✓ ADB 可用: $info" }

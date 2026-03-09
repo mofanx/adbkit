@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
+import com.adbkit.app.service.AdbBinaryManager
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,7 +21,9 @@ data class SettingsUiState(
     val saveHistory: Boolean = true,
     val language: String = "zh",
     val adbStatus: String = "",
-    val isCheckingAdb: Boolean = false
+    val isCheckingAdb: Boolean = false,
+    val adbReady: Boolean = false,
+    val adbDiagnostics: String = ""
 )
 
 class SettingsViewModel : ViewModel() {
@@ -29,6 +32,8 @@ class SettingsViewModel : ViewModel() {
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        // Load ADB ready state
+        _uiState.update { it.copy(adbReady = AdbBinaryManager.adbReady) }
         viewModelScope.launch { repo.adbPath.collect { v -> _uiState.update { it.copy(adbPath = v) } } }
         viewModelScope.launch { repo.fastbootPath.collect { v -> _uiState.update { it.copy(fastbootPath = v) } } }
         viewModelScope.launch { repo.defaultPort.collect { v -> _uiState.update { it.copy(defaultPort = v) } } }
@@ -104,8 +109,15 @@ class SettingsViewModel : ViewModel() {
             } else {
                 "✗ ADB Error: ${result.error.ifEmpty { "not found" }}"
             }
-            _uiState.update { it.copy(isCheckingAdb = false, adbStatus = status) }
+            _uiState.update {
+                it.copy(isCheckingAdb = false, adbStatus = status, adbReady = result.success)
+            }
         }
+    }
+
+    fun showDiagnostics() {
+        val diagnostics = AdbBinaryManager.getStatus(AdbKitApplication.instance)
+        _uiState.update { it.copy(adbDiagnostics = diagnostics) }
     }
 
     fun autoDetectAdb() {

@@ -27,6 +27,20 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Download ADB binaries
+        env:
+          ADB_DOWNLOAD_URL: ${{ secrets.ADB_DOWNLOAD_URL }}
+          ADB_GITHUB_REPO: ${{ secrets.ADB_GITHUB_REPO }}
+          ADB_RELEASE_TAG: ${{ secrets.ADB_RELEASE_TAG }}
+        run: |
+          chmod +x scripts/download_adb_binaries.sh
+          if [ -n "$ADB_DOWNLOAD_URL" ] || [ -n "$ADB_GITHUB_REPO" ]; then
+            ./scripts/download_adb_binaries.sh || echo "::warning::ADB binary download failed, build will use fallback"
+          else
+            echo "::warning::No ADB_DOWNLOAD_URL or ADB_GITHUB_REPO secret set. ADB binaries not bundled."
+            echo "Set these secrets to bundle ADB binaries in the APK."
+          fi
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 

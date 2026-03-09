@@ -28,9 +28,13 @@ class AdbKitApplication : Application() {
                 val (adbPath, fastbootPath) = AdbBinaryManager.setup(instance)
                 AdbService.setAdbPath(adbPath)
                 AdbService.setFastbootPath(fastbootPath)
-                Log.i("AdbKit", "Bundled ADB: $adbPath")
+                Log.i(TAG, "ADB path: $adbPath (ready=${AdbBinaryManager.adbReady})")
+                if (!AdbBinaryManager.adbReady) {
+                    Log.e(TAG, "ADB NOT READY: ${AdbBinaryManager.lastError}")
+                    Log.e(TAG, "Status:\n${AdbBinaryManager.getStatus(instance)}")
+                }
             } catch (e: Exception) {
-                Log.w("AdbKit", "Bundled ADB setup failed: ${e.message}")
+                Log.e(TAG, "ADB setup failed: ${e.message}", e)
             }
 
             // 2. Override with user-saved path if explicitly set
@@ -38,6 +42,7 @@ class AdbKitApplication : Application() {
             val savedPath = repo.adbPath.first()
             if (savedPath != "adb" && savedPath.isNotBlank()) {
                 AdbService.setAdbPath(savedPath)
+                Log.i(TAG, "User ADB path override: $savedPath")
             }
             val savedFastboot = repo.fastbootPath.first()
             if (savedFastboot != "fastboot" && savedFastboot.isNotBlank()) {
@@ -47,6 +52,7 @@ class AdbKitApplication : Application() {
     }
 
     companion object {
+        private const val TAG = "AdbKit"
         lateinit var instance: AdbKitApplication
             private set
     }

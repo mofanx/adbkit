@@ -48,6 +48,48 @@ fun SettingsScreen(
         ) {
             // ADB Configuration
             SettingsSection(title = strings.adbConfig) {
+                // ADB ready status indicator
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (uiState.adbReady)
+                        MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.adbReady) Icons.Filled.CheckCircle else Icons.Filled.Error,
+                            contentDescription = null,
+                            tint = if (uiState.adbReady)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (uiState.adbReady) strings.adbStatusReady else strings.adbStatusNotReady,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (uiState.adbReady)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = "Path: ${uiState.adbPath}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (uiState.adbReady)
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = uiState.adbPath,
                     onValueChange = { viewModel.setAdbPath(it) },
@@ -90,6 +132,29 @@ fun SettingsScreen(
                         else MaterialTheme.colorScheme.error
                     )
                 }
+
+                // Diagnostics button
+                Spacer(modifier = Modifier.height(4.dp))
+                TextButton(onClick = { viewModel.showDiagnostics() }) {
+                    Icon(Icons.Filled.Info, null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(strings.adbDiagnostics)
+                }
+                if (uiState.adbDiagnostics.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = uiState.adbDiagnostics,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = uiState.fastbootPath,
@@ -180,7 +245,7 @@ fun SettingsScreen(
             // About section
             SettingsSection(title = strings.about) {
                 SettingsInfoRow(strings.aboutAppName, "ADB Kit")
-                SettingsInfoRow(strings.aboutVersion, "1.0.0")
+                SettingsInfoRow(strings.aboutVersion, "1.1.0")
                 SettingsInfoRow(strings.aboutDeveloper, "ADB Kit Team")
                 SettingsInfoRow(strings.aboutRepo, "github.com/mofanx/adbkit")
             }

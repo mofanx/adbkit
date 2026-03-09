@@ -325,6 +325,9 @@ object EnStrings : AppStrings {
     override val aboutVersion = "Version"
     override val aboutDeveloper = "Developer"
     override val aboutRepo = "Repository"
+    override val adbStatusReady = "ADB Ready"
+    override val adbStatusNotReady = "ADB Not Ready - Binary not found"
+    override val adbDiagnostics = "Diagnostics"
     override val detecting = "Detecting..."
     override val autoDetecting = "Auto detecting..."
     override val adbAvailable = { info: String -> "✓ ADB available: $info" }

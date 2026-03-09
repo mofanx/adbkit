@@ -88,6 +88,34 @@
 
 ## 构建
 
+### 1. 准备 ADB 二进制文件
+
+应用需要内置 ADB 可执行文件才能在非 root 设备上正常工作。ADB 二进制必须是为 **Android 架构** (ARM64/ARM/x86_64) 编译的，而非桌面 Linux 版本。
+
+```bash
+# 方式一：设置下载 URL（推荐用于 CI）
+ADB_DOWNLOAD_URL=https://your-server/adb-binaries ./scripts/download_adb_binaries.sh
+
+# 方式二：从 GitHub Release 下载
+ADB_GITHUB_REPO=user/repo ADB_RELEASE_TAG=v1.0 ./scripts/download_adb_binaries.sh
+
+# 方式三：仅 arm64（大多数现代设备）
+./scripts/download_adb_binaries.sh --arm64-only
+
+# 方式四：手动放置
+# 将编译好的 adb 放入以下目录：
+#   app/src/main/assets/bin/arm64-v8a/adb
+#   app/src/main/assets/bin/armeabi-v7a/adb
+#   app/src/main/assets/bin/x86_64/adb
+```
+
+**获取 Android 原生 ADB 二进制的途径：**
+- 在 Termux 中执行 `pkg install android-tools`，然后复制 `$(which adb)`
+- 从 AOSP 源码使用 NDK 编译静态链接版本
+- 从可信的第三方预编译项目获取
+
+### 2. 构建 APK
+
 项目使用 GitHub Actions 自动构建。推送到 `main` 分支即可触发构建。
 
 ### GitHub Secrets 配置
@@ -98,6 +126,9 @@
 | `KEYSTORE_PASSWORD` | 密钥库密码 |
 | `KEY_ALIAS` | 密钥别名 |
 | `KEY_PASSWORD` | 密钥密码 |
+| `ADB_DOWNLOAD_URL` | (可选) ADB 二进制下载 URL |
+| `ADB_GITHUB_REPO` | (可选) 存放 ADB 二进制的 GitHub 仓库 |
+| `ADB_RELEASE_TAG` | (可选) GitHub Release 标签 |
 
 ## 许可证
 

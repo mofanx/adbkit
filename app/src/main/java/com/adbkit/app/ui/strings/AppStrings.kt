@@ -340,6 +340,9 @@ interface AppStrings {
     val aboutDeveloper: String
     val aboutRepo: String
     // ADB status messages
+    val adbStatusReady: String
+    val adbStatusNotReady: String
+    val adbDiagnostics: String
     val detecting: String
     val autoDetecting: String
     val adbAvailable: (String) -> String

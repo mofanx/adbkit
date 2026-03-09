@@ -1,0 +1,4 @@
+# ADB/Fastboot binaries (large files, downloaded during build)
+*/adb
+*/fastboot
+!.gitkeep
