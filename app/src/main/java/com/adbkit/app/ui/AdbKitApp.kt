@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.adbkit.app.ui.navigation.Routes
 import com.adbkit.app.ui.navigation.Screen
 import com.adbkit.app.ui.screens.*
 import kotlinx.coroutines.launch
@@ -91,10 +92,10 @@ fun AdbKitApp() {
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Filled.Settings, contentDescription = "设置") },
                     label = { Text("设置") },
-                    selected = currentRoute == Screen.Settings.route,
+                    selected = currentRoute == Routes.SETTINGS,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        navController.navigate(Screen.Settings.route) {
+                        navController.navigate(Routes.SETTINGS) {
                             popUpTo(navController.graph.startDestinationId) { saveState = true }
                             launchSingleTop = true
                         }
@@ -107,36 +108,36 @@ fun AdbKitApp() {
     ) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route
+            startDestination = Routes.HOME
         ) {
-            composable(Screen.Home.route) {
+            composable(Routes.HOME) {
                 HomeScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.DeviceInfo.route) {
+            composable(Routes.DEVICE_INFO) {
                 DeviceInfoScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.Tools.route) {
+            composable(Routes.TOOLS) {
                 ToolsScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.RemoteControl.route) {
+            composable(Routes.REMOTE_CONTROL) {
                 RemoteControlScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.FileManager.route) {
+            composable(Routes.FILE_MANAGER) {
                 FileManagerScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.AppManager.route) {
+            composable(Routes.APP_MANAGER) {
                 AppManagerScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.ProcessManager.route) {
+            composable(Routes.PROCESS_MANAGER) {
                 ProcessManagerScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.Terminal.route) {
+            composable(Routes.TERMINAL) {
                 TerminalScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.Fastboot.route) {
+            composable(Routes.FASTBOOT) {
                 FastbootScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
-            composable(Screen.Settings.route) {
+            composable(Routes.SETTINGS) {
                 SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } })
             }
         }

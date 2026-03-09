@@ -1,3 +1,5 @@
 -keepattributes *Annotation*
 -keep class com.adbkit.app.data.model.** { *; }
+-keep class com.adbkit.app.ui.navigation.Screen$* { *; }
+-keep class com.adbkit.app.ui.navigation.Routes { *; }
 -dontwarn java.lang.invoke.StringConcatFactory

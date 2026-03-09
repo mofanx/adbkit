@@ -41,7 +41,7 @@ fun HomeScreen(
                         Icon(Icons.Filled.Link, contentDescription = "配对")
                     }
                     IconButton(onClick = { }) {
-                        Icon(Icons.Filled.OfflineBolt, contentDescription = "Fastboot")
+                        Icon(Icons.Filled.Star, contentDescription = "Fastboot")
                     }
                     IconButton(onClick = { }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "更多")

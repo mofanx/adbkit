@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -211,7 +212,7 @@ fun FileItemRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = if (isDir) Icons.Filled.Folder else Icons.Filled.InsertDriveFile,
+                imageVector = if (isDir) Icons.Filled.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
                 contentDescription = null,
                 tint = if (isDir) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(32.dp)

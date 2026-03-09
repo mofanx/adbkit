@@ -9,6 +9,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,7 +92,7 @@ private fun ScreenMirrorView(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         FilledTonalButton(onClick = { viewModel.sendKey(4) }) {
-                            Icon(Icons.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("返回")
                         }
@@ -98,15 +102,15 @@ private fun ScreenMirrorView(
                             Text("主页")
                         }
                         FilledTonalButton(onClick = { viewModel.sendKey(187) }) {
-                            Icon(Icons.Filled.ViewList, null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.ViewList, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("最近")
                         }
                         IconButton(onClick = { viewModel.sendKey(25) }) {
-                            Icon(Icons.Filled.VolumeDown, "音量-")
+                            Icon(Icons.AutoMirrored.Filled.VolumeDown, "音量-")
                         }
                         IconButton(onClick = { viewModel.sendKey(24) }) {
-                            Icon(Icons.Filled.VolumeUp, "音量+")
+                            Icon(Icons.AutoMirrored.Filled.VolumeUp, "音量+")
                         }
                         IconButton(onClick = { viewModel.sendKey(26) }) {
                             Icon(Icons.Filled.PowerSettingsNew, "电源")

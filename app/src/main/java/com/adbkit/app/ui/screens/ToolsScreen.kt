@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -46,7 +47,7 @@ fun ToolsScreen(
         ToolItem("蓝牙开关", Icons.Filled.Bluetooth, "bluetooth", "开关蓝牙"),
         ToolItem("飞行模式", Icons.Outlined.AirplanemodeActive, "airplane", "开关飞行模式"),
         ToolItem("打开链接", Icons.Outlined.Link, "open_url", "在设备上打开URL"),
-        ToolItem("启动应用", Icons.Outlined.OpenInNew, "launch_app", "启动指定应用"),
+        ToolItem("启动应用", Icons.AutoMirrored.Outlined.OpenInNew, "launch_app", "启动指定应用"),
         ToolItem("当前Activity", Icons.Outlined.Layers, "current_activity", "查看当前Activity"),
         ToolItem("Logcat", Icons.Filled.BugReport, "logcat", "查看系统日志"),
         ToolItem("系统属性", Icons.Outlined.Settings, "sysprop", "查看/修改系统属性"),

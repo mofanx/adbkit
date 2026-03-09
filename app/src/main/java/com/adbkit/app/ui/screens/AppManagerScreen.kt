@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -210,7 +211,7 @@ fun AppItemRow(
                     DropdownMenuItem(
                         text = { Text("启动") },
                         onClick = { showMenu = false; onLaunch() },
-                        leadingIcon = { Icon(Icons.Filled.Launch, null) }
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Launch, null) }
                     )
                     DropdownMenuItem(
                         text = { Text("强制停止") },
