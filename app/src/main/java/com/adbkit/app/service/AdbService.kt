@@ -10,6 +10,20 @@ import java.io.InputStreamReader
 object AdbService {
 
     private var currentDevice: String? = null
+    private var adbPath: String = "adb"
+    private var fastbootPath: String = "fastboot"
+
+    fun setAdbPath(path: String) {
+        adbPath = path.ifBlank { "adb" }
+    }
+
+    fun getAdbPath(): String = adbPath
+
+    fun setFastbootPath(path: String) {
+        fastbootPath = path.ifBlank { "fastboot" }
+    }
+
+    fun getFastbootPath(): String = fastbootPath
 
     fun setCurrentDevice(address: String?) {
         currentDevice = address
@@ -42,7 +56,7 @@ object AdbService {
     suspend fun adb(vararg args: String): CommandResult {
         val device = currentDevice
         val cmd = buildString {
-            append("adb")
+            append(adbPath)
             if (device != null) {
                 append(" -s $device")
             }
@@ -56,19 +70,32 @@ object AdbService {
     }
 
     suspend fun connect(address: String): CommandResult {
-        return executeCommand("adb connect $address")
+        return executeCommand("$adbPath connect $address")
     }
 
     suspend fun disconnect(address: String): CommandResult {
-        return executeCommand("adb disconnect $address")
+        return executeCommand("$adbPath disconnect $address")
     }
 
     suspend fun disconnectAll(): CommandResult {
-        return executeCommand("adb disconnect")
+        return executeCommand("$adbPath disconnect")
+    }
+
+    suspend fun killServer(): CommandResult {
+        return executeCommand("$adbPath kill-server")
+    }
+
+    suspend fun startServer(): CommandResult {
+        return executeCommand("$adbPath start-server")
+    }
+
+    suspend fun restartServer(): CommandResult {
+        killServer()
+        return startServer()
     }
 
     suspend fun getConnectedDevices(): List<String> {
-        val result = executeCommand("adb devices -l")
+        val result = executeCommand("$adbPath devices -l")
         if (!result.success) return emptyList()
         return result.output.lines()
             .drop(1)
@@ -324,7 +351,7 @@ object AdbService {
     }
 
     suspend fun fastbootCommand(vararg args: String): CommandResult {
-        val cmd = "fastboot ${args.joinToString(" ")}"
+        val cmd = "$fastbootPath ${args.joinToString(" ")}"
         return executeCommand(cmd)
     }
 
@@ -333,7 +360,7 @@ object AdbService {
     }
 
     suspend fun fastbootDevices(): CommandResult {
-        return executeCommand("fastboot devices")
+        return executeCommand("$fastbootPath devices")
     }
 
     suspend fun inputText(text: String): CommandResult {
@@ -434,7 +461,7 @@ object AdbService {
         try {
             val device = currentDevice
             val cmd = buildString {
-                append("adb")
+                append(adbPath)
                 if (device != null) append(" -s $device")
                 append(" exec-out screencap -p")
             }

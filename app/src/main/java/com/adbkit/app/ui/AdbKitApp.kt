@@ -111,7 +111,22 @@ fun AdbKitApp() {
             startDestination = Routes.HOME
         ) {
             composable(Routes.HOME) {
-                HomeScreen(onMenuClick = { scope.launch { drawerState.open() } })
+                HomeScreen(
+                    onMenuClick = { scope.launch { drawerState.open() } },
+                    onNavigateToFastboot = {
+                        navController.navigate(Routes.FASTBOOT) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Routes.SETTINGS) {
+                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
             }
             composable(Routes.DEVICE_INFO) {
                 DeviceInfoScreen(onMenuClick = { scope.launch { drawerState.open() } })

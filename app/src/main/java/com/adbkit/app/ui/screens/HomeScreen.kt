@@ -20,6 +20,8 @@ import com.adbkit.app.ui.viewmodel.HomeViewModel
 @Composable
 fun HomeScreen(
     onMenuClick: () -> Unit,
+    onNavigateToFastboot: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -40,11 +42,46 @@ fun HomeScreen(
                     IconButton(onClick = { viewModel.togglePairDialog() }) {
                         Icon(Icons.Filled.Link, contentDescription = "配对")
                     }
-                    IconButton(onClick = { }) {
+                    IconButton(onClick = onNavigateToFastboot) {
                         Icon(Icons.Filled.Star, contentDescription = "Fastboot")
                     }
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = "设置")
+                    }
+                    Box {
+                        IconButton(onClick = { viewModel.toggleMoreMenu() }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "更多")
+                        }
+                        DropdownMenu(
+                            expanded = uiState.showMoreMenu,
+                            onDismissRequest = { viewModel.dismissMoreMenu() }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("重启 ADB 服务") },
+                                onClick = {
+                                    viewModel.dismissMoreMenu()
+                                    viewModel.restartAdbServer()
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Refresh, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("断开所有设备") },
+                                onClick = {
+                                    viewModel.dismissMoreMenu()
+                                    viewModel.disconnectAll()
+                                },
+                                leadingIcon = { Icon(Icons.Filled.LinkOff, null) }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("设置") },
+                                onClick = {
+                                    viewModel.dismissMoreMenu()
+                                    onNavigateToSettings()
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Settings, null) }
+                            )
+                        }
                     }
                 }
             )

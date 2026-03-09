@@ -16,7 +16,8 @@ data class HomeUiState(
     val isConnecting: Boolean = false,
     val statusMessage: String = "",
     val isError: Boolean = false,
-    val showPairDialog: Boolean = false
+    val showPairDialog: Boolean = false,
+    val showMoreMenu: Boolean = false
 )
 
 class HomeViewModel : ViewModel() {
@@ -109,6 +110,14 @@ class HomeViewModel : ViewModel() {
         _uiState.update { it.copy(showPairDialog = !it.showPairDialog) }
     }
 
+    fun toggleMoreMenu() {
+        _uiState.update { it.copy(showMoreMenu = !it.showMoreMenu) }
+    }
+
+    fun dismissMoreMenu() {
+        _uiState.update { it.copy(showMoreMenu = false) }
+    }
+
     fun pairDevice(ip: String, port: String, code: String) {
         if (ip.isBlank() || port.isBlank() || code.isBlank()) {
             _uiState.update { it.copy(statusMessage = "请填写完整信息", isError = true) }
@@ -116,7 +125,7 @@ class HomeViewModel : ViewModel() {
         }
         viewModelScope.launch {
             _uiState.update { it.copy(showPairDialog = false, statusMessage = "正在配对...") }
-            val result = AdbService.executeCommand("adb pair $ip:$port $code")
+            val result = AdbService.executeCommand("${AdbService.getAdbPath()} pair $ip:$port $code")
             if (result.success && result.output.contains("Successfully")) {
                 _uiState.update { it.copy(statusMessage = "配对成功", isError = false) }
                 refreshDevices()
@@ -125,6 +134,30 @@ class HomeViewModel : ViewModel() {
                     it.copy(statusMessage = result.error.ifEmpty { "配对失败" }, isError = true)
                 }
             }
+        }
+    }
+
+    fun restartAdbServer() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "正在重启 ADB 服务...", isError = false) }
+            val result = AdbService.restartServer()
+            if (result.success) {
+                _uiState.update { it.copy(statusMessage = "ADB 服务已重启", isError = false) }
+                refreshDevices()
+            } else {
+                _uiState.update {
+                    it.copy(statusMessage = "重启失败: ${result.error}", isError = true)
+                }
+            }
+        }
+    }
+
+    fun disconnectAll() {
+        viewModelScope.launch {
+            AdbService.disconnectAll()
+            AdbService.setCurrentDevice(null)
+            refreshDevices()
+            _uiState.update { it.copy(statusMessage = "已断开所有设备", isError = false, selectedDevice = null) }
         }
     }
 }
