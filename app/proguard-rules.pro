@@ -1,0 +1,3 @@
+-keepattributes *Annotation*
+-keep class com.adbkit.app.data.model.** { *; }
+-dontwarn java.lang.invoke.StringConcatFactory

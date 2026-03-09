@@ -1,0 +1,437 @@
+package com.adbkit.app.service
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
+
+object AdbService {
+
+    private var currentDevice: String? = null
+
+    fun setCurrentDevice(address: String?) {
+        currentDevice = address
+    }
+
+    fun getCurrentDevice(): String? = currentDevice
+
+    suspend fun executeCommand(command: String): CommandResult = withContext(Dispatchers.IO) {
+        try {
+            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText()
+            val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText()
+            val exitCode = process.waitFor()
+            CommandResult(
+                success = exitCode == 0,
+                output = stdout.trim(),
+                error = stderr.trim(),
+                exitCode = exitCode
+            )
+        } catch (e: Exception) {
+            CommandResult(
+                success = false,
+                output = "",
+                error = e.message ?: "Unknown error",
+                exitCode = -1
+            )
+        }
+    }
+
+    suspend fun adb(vararg args: String): CommandResult {
+        val device = currentDevice
+        val cmd = buildString {
+            append("adb")
+            if (device != null) {
+                append(" -s $device")
+            }
+            args.forEach { append(" $it") }
+        }
+        return executeCommand(cmd)
+    }
+
+    suspend fun shell(command: String): CommandResult {
+        return adb("shell", command)
+    }
+
+    suspend fun connect(address: String): CommandResult {
+        return executeCommand("adb connect $address")
+    }
+
+    suspend fun disconnect(address: String): CommandResult {
+        return executeCommand("adb disconnect $address")
+    }
+
+    suspend fun disconnectAll(): CommandResult {
+        return executeCommand("adb disconnect")
+    }
+
+    suspend fun getConnectedDevices(): List<String> {
+        val result = executeCommand("adb devices -l")
+        if (!result.success) return emptyList()
+        return result.output.lines()
+            .drop(1)
+            .filter { it.isNotBlank() && !it.startsWith("*") }
+            .mapNotNull { line ->
+                val parts = line.split("\\s+".toRegex())
+                if (parts.size >= 2 && parts[1] != "offline") parts[0] else null
+            }
+    }
+
+    suspend fun getDeviceProp(prop: String): String {
+        val result = shell("getprop $prop")
+        return if (result.success) result.output.trim() else ""
+    }
+
+    suspend fun getDeviceInfo(): Map<String, String> {
+        val props = mapOf(
+            "型号" to "ro.product.model",
+            "品牌" to "ro.product.brand",
+            "设备名" to "ro.product.device",
+            "Android版本" to "ro.build.version.release",
+            "SDK版本" to "ro.build.version.sdk",
+            "Build ID" to "ro.build.display.id",
+            "序列号" to "ro.serialno",
+            "硬件" to "ro.hardware",
+            "CPU架构" to "ro.product.cpu.abi",
+            "安全补丁" to "ro.build.version.security_patch",
+            "基带版本" to "gsm.version.baseband",
+            "内核版本" to "os.version"
+        )
+        val result = mutableMapOf<String, String>()
+        for ((label, prop) in props) {
+            result[label] = getDeviceProp(prop)
+        }
+        // Extra info via shell commands
+        val screenSize = shell("wm size")
+        if (screenSize.success) result["屏幕分辨率"] = screenSize.output.replace("Physical size: ", "")
+
+        val density = shell("wm density")
+        if (density.success) result["屏幕密度"] = density.output.replace("Physical density: ", "")
+
+        val battery = shell("dumpsys battery")
+        if (battery.success) {
+            battery.output.lines().forEach { line ->
+                val trimmed = line.trim()
+                when {
+                    trimmed.startsWith("level:") -> result["电池电量"] = "${trimmed.substringAfter(":").trim()}%"
+                    trimmed.startsWith("temperature:") -> {
+                        val temp = trimmed.substringAfter(":").trim().toIntOrNull()
+                        if (temp != null) result["电池温度"] = "${temp / 10.0}°C"
+                    }
+                    trimmed.startsWith("status:") -> {
+                        val status = when (trimmed.substringAfter(":").trim()) {
+                            "2" -> "充电中"
+                            "3" -> "放电中"
+                            "4" -> "未充电"
+                            "5" -> "已充满"
+                            else -> "未知"
+                        }
+                        result["电池状态"] = status
+                    }
+                }
+            }
+        }
+
+        val memInfo = shell("cat /proc/meminfo")
+        if (memInfo.success) {
+            val lines = memInfo.output.lines()
+            val totalLine = lines.find { it.startsWith("MemTotal:") }
+            val availLine = lines.find { it.startsWith("MemAvailable:") }
+            totalLine?.let {
+                val kb = it.replace("MemTotal:", "").replace("kB", "").trim().toLongOrNull()
+                if (kb != null) result["总内存"] = "${kb / 1024}MB"
+            }
+            availLine?.let {
+                val kb = it.replace("MemAvailable:", "").replace("kB", "").trim().toLongOrNull()
+                if (kb != null) result["可用内存"] = "${kb / 1024}MB"
+            }
+        }
+
+        val dfResult = shell("df /data")
+        if (dfResult.success) {
+            val dataLine = dfResult.output.lines().lastOrNull { it.contains("/data") }
+            dataLine?.let {
+                val parts = it.split("\\s+".toRegex())
+                if (parts.size >= 4) {
+                    result["存储总量"] = parts[1]
+                    result["存储可用"] = parts[3]
+                }
+            }
+        }
+
+        val uptimeResult = shell("uptime")
+        if (uptimeResult.success) result["运行时间"] = uptimeResult.output.trim()
+
+        val ipResult = shell("ip route | grep 'src'")
+        if (ipResult.success) {
+            val ip = ipResult.output.lines().firstOrNull()?.let { line ->
+                "src\\s+(\\S+)".toRegex().find(line)?.groupValues?.getOrNull(1)
+            }
+            if (ip != null) result["IP地址"] = ip
+        }
+
+        val wifiMac = shell("cat /sys/class/net/wlan0/address")
+        if (wifiMac.success) result["WiFi MAC"] = wifiMac.output.trim()
+
+        return result
+    }
+
+    suspend fun listFiles(path: String): List<Map<String, String>> {
+        val result = shell("ls -la '$path'")
+        if (!result.success) return emptyList()
+        return result.output.lines()
+            .filter { it.isNotBlank() && !it.startsWith("total") }
+            .mapNotNull { line ->
+                val parts = line.split("\\s+".toRegex(), limit = 9)
+                if (parts.size >= 8) {
+                    val name = if (parts.size >= 9) parts[8] else parts[7]
+                    if (name == "." || name == "..") return@mapNotNull null
+                    mapOf(
+                        "permissions" to parts[0],
+                        "owner" to parts[2],
+                        "group" to parts[3],
+                        "size" to (parts.getOrNull(4) ?: "0"),
+                        "date" to "${parts.getOrNull(5) ?: ""} ${parts.getOrNull(6) ?: ""}",
+                        "name" to name,
+                        "isDirectory" to (parts[0].startsWith("d")).toString(),
+                        "path" to "$path/$name"
+                    )
+                } else null
+            }
+    }
+
+    suspend fun pullFile(remotePath: String, localPath: String): CommandResult {
+        return adb("pull", "'$remotePath'", "'$localPath'")
+    }
+
+    suspend fun pushFile(localPath: String, remotePath: String): CommandResult {
+        return adb("push", "'$localPath'", "'$remotePath'")
+    }
+
+    suspend fun deleteFile(path: String): CommandResult {
+        return shell("rm -rf '$path'")
+    }
+
+    suspend fun createDirectory(path: String): CommandResult {
+        return shell("mkdir -p '$path'")
+    }
+
+    suspend fun getInstalledPackages(systemApps: Boolean = false): List<String> {
+        val flag = if (systemApps) "-s" else "-3"
+        val result = shell("pm list packages $flag")
+        if (!result.success) return emptyList()
+        return result.output.lines()
+            .filter { it.startsWith("package:") }
+            .map { it.removePrefix("package:").trim() }
+            .sorted()
+    }
+
+    suspend fun getAppDetail(packageName: String): Map<String, String> {
+        val info = mutableMapOf<String, String>()
+        val dump = shell("dumpsys package $packageName")
+        if (dump.success) {
+            dump.output.lines().forEach { line ->
+                val trimmed = line.trim()
+                when {
+                    trimmed.startsWith("versionName=") -> info["版本名"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("versionCode=") -> info["版本号"] = trimmed.substringAfter("=").split(" ")[0]
+                    trimmed.startsWith("firstInstallTime=") -> info["安装时间"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("lastUpdateTime=") -> info["更新时间"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("codePath=") -> info["APK路径"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("dataDir=") -> info["数据目录"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("targetSdk=") -> info["目标SDK"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("minSdk=") -> info["最低SDK"] = trimmed.substringAfter("=")
+                }
+            }
+        }
+        return info
+    }
+
+    suspend fun installApp(apkPath: String): CommandResult {
+        return adb("install", "-r", "'$apkPath'")
+    }
+
+    suspend fun uninstallApp(packageName: String, keepData: Boolean = false): CommandResult {
+        return if (keepData) {
+            adb("uninstall", "-k", packageName)
+        } else {
+            adb("uninstall", packageName)
+        }
+    }
+
+    suspend fun forceStopApp(packageName: String): CommandResult {
+        return shell("am force-stop $packageName")
+    }
+
+    suspend fun clearAppData(packageName: String): CommandResult {
+        return shell("pm clear $packageName")
+    }
+
+    suspend fun disableApp(packageName: String): CommandResult {
+        return shell("pm disable-user --user 0 $packageName")
+    }
+
+    suspend fun enableApp(packageName: String): CommandResult {
+        return shell("pm enable $packageName")
+    }
+
+    suspend fun getProcessList(): List<Map<String, String>> {
+        val result = shell("ps -A -o PID,USER,RSS,%CPU,NAME")
+        if (!result.success) return emptyList()
+        return result.output.lines()
+            .drop(1)
+            .filter { it.isNotBlank() }
+            .mapNotNull { line ->
+                val parts = line.trim().split("\\s+".toRegex(), limit = 5)
+                if (parts.size >= 5) {
+                    mapOf(
+                        "pid" to parts[0],
+                        "user" to parts[1],
+                        "memory" to parts[2],
+                        "cpu" to parts[3],
+                        "name" to parts[4]
+                    )
+                } else null
+            }
+    }
+
+    suspend fun killProcess(pid: String): CommandResult {
+        return shell("kill -9 $pid")
+    }
+
+    suspend fun takeScreenshot(savePath: String): CommandResult {
+        val remotePath = "/sdcard/screenshot_temp.png"
+        val cap = shell("screencap -p $remotePath")
+        if (!cap.success) return cap
+        val pull = adb("pull", remotePath, "'$savePath'")
+        shell("rm $remotePath")
+        return pull
+    }
+
+    suspend fun startScreenRecord(savePath: String, timeLimit: Int = 180): CommandResult {
+        val remotePath = "/sdcard/screenrecord_temp.mp4"
+        return shell("screenrecord --time-limit $timeLimit $remotePath")
+    }
+
+    suspend fun reboot(mode: String = ""): CommandResult {
+        return if (mode.isEmpty()) {
+            adb("reboot")
+        } else {
+            adb("reboot", mode)
+        }
+    }
+
+    suspend fun fastbootCommand(vararg args: String): CommandResult {
+        val cmd = "fastboot ${args.joinToString(" ")}"
+        return executeCommand(cmd)
+    }
+
+    suspend fun fastbootFlash(partition: String, imagePath: String): CommandResult {
+        return fastbootCommand("flash", partition, imagePath)
+    }
+
+    suspend fun fastbootDevices(): CommandResult {
+        return executeCommand("fastboot devices")
+    }
+
+    suspend fun inputText(text: String): CommandResult {
+        return shell("input text '${text.replace("'", "\\'")}'")
+    }
+
+    suspend fun inputKeyEvent(keyCode: Int): CommandResult {
+        return shell("input keyevent $keyCode")
+    }
+
+    suspend fun inputTap(x: Int, y: Int): CommandResult {
+        return shell("input tap $x $y")
+    }
+
+    suspend fun inputSwipe(x1: Int, y1: Int, x2: Int, y2: Int, duration: Int = 300): CommandResult {
+        return shell("input swipe $x1 $y1 $x2 $y2 $duration")
+    }
+
+    suspend fun setScreenBrightness(value: Int): CommandResult {
+        return shell("settings put system screen_brightness $value")
+    }
+
+    suspend fun setScreenTimeout(ms: Int): CommandResult {
+        return shell("settings put system screen_off_timeout $ms")
+    }
+
+    suspend fun getWifiStatus(): CommandResult {
+        return shell("dumpsys wifi | grep 'Wi-Fi is'")
+    }
+
+    suspend fun toggleWifi(enable: Boolean): CommandResult {
+        return shell("svc wifi ${if (enable) "enable" else "disable"}")
+    }
+
+    suspend fun toggleBluetooth(enable: Boolean): CommandResult {
+        return shell("svc bluetooth ${if (enable) "enable" else "disable"}")
+    }
+
+    suspend fun toggleAirplaneMode(enable: Boolean): CommandResult {
+        val value = if (enable) "1" else "0"
+        shell("settings put global airplane_mode_on $value")
+        return shell("am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $enable")
+    }
+
+    suspend fun openUrl(url: String): CommandResult {
+        return shell("am start -a android.intent.action.VIEW -d '$url'")
+    }
+
+    suspend fun launchApp(packageName: String): CommandResult {
+        return shell("monkey -p $packageName -c android.intent.category.LAUNCHER 1")
+    }
+
+    suspend fun getLogcat(lines: Int = 100, filter: String = ""): CommandResult {
+        val cmd = if (filter.isNotEmpty()) {
+            "logcat -d -t $lines | grep -i '$filter'"
+        } else {
+            "logcat -d -t $lines"
+        }
+        return shell(cmd)
+    }
+
+    suspend fun clearLogcat(): CommandResult {
+        return shell("logcat -c")
+    }
+
+    suspend fun backupApp(packageName: String, savePath: String): CommandResult {
+        val apkPath = shell("pm path $packageName")
+        if (!apkPath.success) return apkPath
+        val path = apkPath.output.replace("package:", "").trim()
+        return adb("pull", path, "'$savePath'")
+    }
+
+    suspend fun grantPermission(packageName: String, permission: String): CommandResult {
+        return shell("pm grant $packageName $permission")
+    }
+
+    suspend fun revokePermission(packageName: String, permission: String): CommandResult {
+        return shell("pm revoke $packageName $permission")
+    }
+
+    suspend fun getAppPermissions(packageName: String): List<String> {
+        val result = shell("dumpsys package $packageName | grep permission")
+        if (!result.success) return emptyList()
+        return result.output.lines()
+            .filter { it.contains("android.permission.") }
+            .map { it.trim() }
+    }
+
+    suspend fun setSystemProp(prop: String, value: String): CommandResult {
+        return shell("setprop $prop $value")
+    }
+
+    suspend fun dumpActivity(): CommandResult {
+        return shell("dumpsys activity top | grep ACTIVITY")
+    }
+}
+
+data class CommandResult(
+    val success: Boolean,
+    val output: String,
+    val error: String,
+    val exitCode: Int
+)
