@@ -118,8 +118,17 @@ download_from_github_release() {
     local success=0
     for abi in "${ABIS[@]}"; do
         local target="$ASSETS_BIN/$abi/adb"
-        local url="$base/adb-$abi"
-        echo -n "  $abi ... "
+        
+        # Map Android ABI to typical release architecture names
+        local arch_suffix="$abi"
+        case "$abi" in
+            "arm64-v8a") arch_suffix="aarch64" ;;
+            "armeabi-v7a") arch_suffix="arm" ;;
+            "x86_64") arch_suffix="x86_64" ;;
+        esac
+        
+        local url="$base/adb-$arch_suffix"
+        echo -n "  $abi (as $arch_suffix) ... "
         if curl -fsSL --connect-timeout 15 --max-time 120 -o "$target" "$url" 2>/dev/null; then
             chmod +x "$target"
             local size=$(wc -c < "$target")
