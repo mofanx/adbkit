@@ -32,8 +32,8 @@ class SettingsViewModel : ViewModel() {
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        // Load ADB ready state
-        _uiState.update { it.copy(adbReady = AdbBinaryManager.adbReady) }
+        // Reactively observe ADB ready state
+        viewModelScope.launch { AdbBinaryManager.adbReady.collect { v -> _uiState.update { it.copy(adbReady = v) } } }
         viewModelScope.launch { repo.adbPath.collect { v -> _uiState.update { it.copy(adbPath = v) } } }
         viewModelScope.launch { repo.fastbootPath.collect { v -> _uiState.update { it.copy(fastbootPath = v) } } }
         viewModelScope.launch { repo.defaultPort.collect { v -> _uiState.update { it.copy(defaultPort = v) } } }
@@ -123,11 +123,11 @@ class SettingsViewModel : ViewModel() {
     fun autoDetectAdb() {
         _uiState.update { it.copy(isCheckingAdb = true, adbStatus = "") }
         viewModelScope.launch {
+            val nativeLibDir = AdbKitApplication.instance.applicationInfo.nativeLibraryDir
             val candidatePaths = listOf(
+                "$nativeLibDir/libadb.so",
                 "adb",
-                "${AdbKitApplication.instance.filesDir.absolutePath}/bin/adb",
                 "/data/local/tmp/adb",
-                "${AdbKitApplication.instance.filesDir.absolutePath}/adb",
                 "/system/bin/adb",
                 "/system/xbin/adb",
                 "/sbin/adb",

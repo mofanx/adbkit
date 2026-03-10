@@ -27,6 +27,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isAdbReady by AdbBinaryManager.adbReady.collectAsState()
     val strings = LocalStrings.current
 
     Scaffold(
@@ -89,7 +90,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // ADB not ready warning banner
-            if (!AdbBinaryManager.adbReady) {
+            if (!isAdbReady) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),

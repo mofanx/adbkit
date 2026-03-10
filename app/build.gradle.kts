@@ -12,8 +12,8 @@ android {
         applicationId = "com.adbkit.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.1.1"
     }
 
     signingConfigs {
@@ -53,6 +53,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        // Extract .so files to nativeLibraryDir on install.
+        // Required because libadb.so is an executable (not a JNI library)
+        // that we run via ProcessBuilder, so it must exist on disk.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     applicationVariants.all {

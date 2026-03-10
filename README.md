@@ -92,27 +92,30 @@
 
 应用需要内置 ADB 可执行文件才能在非 root 设备上正常工作。ADB 二进制必须是为 **Android 架构** (ARM64/ARM/x86_64) 编译的，而非桌面 Linux 版本。
 
-```bash
-# 方式一：设置下载 URL（推荐用于 CI）
-ADB_DOWNLOAD_URL=https://your-server/adb-binaries ./scripts/download_adb_binaries.sh
+二进制文件以 `.so` 扩展名放在 `jniLibs/` 目录中，Android 系统会将其提取到 `nativeLibraryDir`（该目录有可执行权限，避免 Android 10+ 对应用私有目录的 `noexec` 限制）。
 
-# 方式二：从 GitHub Release 下载
-ADB_GITHUB_REPO=user/repo ADB_RELEASE_TAG=v1.0 ./scripts/download_adb_binaries.sh
+```bash
+# 方式一：从 GitHub Release 下载（推荐）
+ADB_GITHUB_REPO=mofanx/adb ADB_RELEASE_TAG=v1.0 ./scripts/download_adb_binaries.sh
+
+# 方式二：设置自定义下载 URL
+ADB_DOWNLOAD_URL=https://your-server/bins ./scripts/download_adb_binaries.sh
 
 # 方式三：仅 arm64（大多数现代设备）
 ./scripts/download_adb_binaries.sh --arm64-only
 
-# 方式四：手动放置
-# 将编译好的 adb 放入以下目录：
-#   app/src/main/assets/bin/arm64-v8a/adb
-#   app/src/main/assets/bin/armeabi-v7a/adb
-#   app/src/main/assets/bin/x86_64/adb
+# 方式四：手动放置（需命名为 libadb.so）
+#   app/src/main/jniLibs/arm64-v8a/libadb.so
+#   app/src/main/jniLibs/armeabi-v7a/libadb.so
+#   app/src/main/jniLibs/x86_64/libadb.so
 ```
 
 **获取 Android 原生 ADB 二进制的途径：**
 - 在 Termux 中执行 `pkg install android-tools`，然后复制 `$(which adb)`
 - 从 AOSP 源码使用 NDK 编译静态链接版本
 - 从可信的第三方预编译项目获取
+
+> **注意**：文件必须命名为 `libadb.so`（Android 要求 `jniLibs` 中的文件以 `lib` 开头、`.so` 结尾）。下载脚本会自动处理重命名。
 
 ### 2. 构建 APK
 
@@ -127,7 +130,7 @@ ADB_GITHUB_REPO=user/repo ADB_RELEASE_TAG=v1.0 ./scripts/download_adb_binaries.s
 | `KEY_ALIAS` | 密钥别名 |
 | `KEY_PASSWORD` | 密钥密码 |
 | `ADB_DOWNLOAD_URL` | (可选) ADB 二进制下载 URL |
-| `ADB_GITHUB_REPO` | (可选) 存放 ADB 二进制的 GitHub 仓库 |
+| `ADB_GITHUB_REPO` | (可选) 存放 ADB 二进制的 GitHub 仓库，如mofanx/adb |
 | `ADB_RELEASE_TAG` | (可选) GitHub Release 标签 |
 
 ## 许可证

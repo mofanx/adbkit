@@ -1,61 +1,72 @@
 #!/bin/bash
 # Download pre-compiled static ADB binaries for Android
 #
-# These are ADB binaries compiled for Android ARM/x86 architectures
-# so they can run ON an Android device to control other devices via WiFi ADB.
+# Binaries are placed in jniLibs/<abi>/libadb.so so that Android's
+# PackageManager extracts them to nativeLibraryDir (which has exec permission).
+# This avoids the W^X / noexec restriction on app private directories (Android 10+).
 #
 # Usage:
-#   ./scripts/download_adb_binaries.sh              # download all
-#   ./scripts/download_adb_binaries.sh --force       # re-download
+#   ./scripts/download_adb_binaries.sh              # download all ABIs
+#   ./scripts/download_adb_binaries.sh --force       # re-download even if present
 #   ./scripts/download_adb_binaries.sh --arm64-only   # arm64 only (most devices)
 #
 # Sources (in priority order):
-#   1. ADB_DOWNLOAD_URL env var  (custom URL: $URL/{arm64-v8a,armeabi-v7a,x86_64}/adb)
-#   2. GitHub Release of this repo (if ADB_RELEASE_TAG is set)
-#   3. Build from Android platform-tools source via NDK (requires NDK)
+#   1. ADB_DOWNLOAD_URL env var  (custom URL: $URL/adb-{aarch64,arm,x86_64})
+#   2. GitHub Release (ADB_GITHUB_REPO + ADB_RELEASE_TAG)
+#   3. Local adb binary (Termux)
 #   4. Manual placement instructions
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-ASSETS_BIN="$PROJECT_DIR/app/src/main/assets/bin"
+JNILIBS="$PROJECT_DIR/app/src/main/jniLibs"
 
 ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 FORCE=false
-ARM64_ONLY=false
+
+# Map Android ABI -> release file architecture suffix
+abi_to_arch() {
+    case "$1" in
+        "arm64-v8a")   echo "aarch64" ;;
+        "armeabi-v7a") echo "arm" ;;
+        "x86_64")      echo "x86_64" ;;
+        "x86")         echo "i686" ;;
+        *)             echo "$1" ;;
+    esac
+}
 
 for arg in "$@"; do
     case "$arg" in
         --force) FORCE=true ;;
-        --arm64-only) ARM64_ONLY=true; ABIS=("arm64-v8a") ;;
+        --arm64-only) ABIS=("arm64-v8a") ;;
     esac
 done
 
 echo "=== ADB Binary Download Script ==="
-echo "Target: $ASSETS_BIN"
+echo "Target: $JNILIBS/<abi>/libadb.so"
 echo ""
 
 # Create directory structure
 for abi in "${ABIS[@]}"; do
-    mkdir -p "$ASSETS_BIN/$abi"
+    mkdir -p "$JNILIBS/$abi"
 done
 
 # Check existing binaries
 check_existing() {
     local count=0
     for abi in "${ABIS[@]}"; do
-        if [ -f "$ASSETS_BIN/$abi/adb" ] && [ -s "$ASSETS_BIN/$abi/adb" ]; then
-            local size=$(wc -c < "$ASSETS_BIN/$abi/adb")
-            # Must be > 100KB to be a real binary (not a placeholder)
+        local f="$JNILIBS/$abi/libadb.so"
+        if [ -f "$f" ] && [ -s "$f" ]; then
+            local size=$(wc -c < "$f")
             if [ "$size" -gt 100000 ]; then
                 count=$((count + 1))
-                echo "  [OK] $abi/adb ($size bytes)"
+                echo "  [OK] $abi/libadb.so ($size bytes)"
             else
-                echo "  [BAD] $abi/adb too small ($size bytes), likely placeholder"
+                echo "  [BAD] $abi/libadb.so too small ($size bytes)"
             fi
         else
-            echo "  [MISSING] $abi/adb"
+            echo "  [MISSING] $abi/libadb.so"
         fi
     done
     echo "$count"
@@ -78,9 +89,10 @@ download_from_url() {
     echo "Downloading from: $base_url"
     local success=0
     for abi in "${ABIS[@]}"; do
-        local target="$ASSETS_BIN/$abi/adb"
-        local url="$base_url/$abi/adb"
-        echo -n "  $abi ... "
+        local target="$JNILIBS/$abi/libadb.so"
+        local arch=$(abi_to_arch "$abi")
+        local url="$base_url/adb-$arch"
+        echo -n "  $abi ($arch) ... "
         if curl -fsSL --connect-timeout 15 --max-time 120 -o "$target" "$url" 2>/dev/null; then
             chmod +x "$target"
             local size=$(wc -c < "$target")
@@ -117,19 +129,11 @@ download_from_github_release() {
     local base="https://github.com/$repo/releases/download/$tag"
     local success=0
     for abi in "${ABIS[@]}"; do
-        local target="$ASSETS_BIN/$abi/adb"
-        
-        # Map Android ABI to typical release architecture names
-        local arch_suffix="$abi"
-        case "$abi" in
-            "arm64-v8a") arch_suffix="aarch64" ;;
-            "armeabi-v7a") arch_suffix="arm" ;;
-            "x86_64") arch_suffix="x86_64" ;;
-        esac
-        
-        local url="$base/adb-$arch_suffix"
-        echo -n "  $abi (as $arch_suffix) ... "
-        if curl -fsSL --connect-timeout 15 --max-time 120 -o "$target" "$url" 2>/dev/null; then
+        local target="$JNILIBS/$abi/libadb.so"
+        local arch=$(abi_to_arch "$abi")
+        local url="$base/adb-$arch"
+        echo -n "  $abi ($arch) ... "
+        if curl -fsSL -L --connect-timeout 15 --max-time 120 -o "$target" "$url" 2>/dev/null; then
             chmod +x "$target"
             local size=$(wc -c < "$target")
             if [ "$size" -gt 100000 ]; then
@@ -164,9 +168,9 @@ copy_local_adb() {
     esac
 
     if [ -n "$target_abi" ]; then
-        cp "$adb_path" "$ASSETS_BIN/$target_abi/adb"
-        chmod +x "$ASSETS_BIN/$target_abi/adb"
-        echo "  Copied to $target_abi"
+        cp "$adb_path" "$JNILIBS/$target_abi/libadb.so"
+        chmod +x "$JNILIBS/$target_abi/libadb.so"
+        echo "  Copied to $target_abi/libadb.so"
         return 0
     else
         echo "  Unknown architecture"
@@ -207,16 +211,17 @@ echo ""
 echo "=== Final Status ==="
 ALL_OK=true
 for abi in "${ABIS[@]}"; do
-    if [ -f "$ASSETS_BIN/$abi/adb" ] && [ -s "$ASSETS_BIN/$abi/adb" ]; then
-        local_size=$(wc -c < "$ASSETS_BIN/$abi/adb")
+    local_f="$JNILIBS/$abi/libadb.so"
+    if [ -f "$local_f" ] && [ -s "$local_f" ]; then
+        local_size=$(wc -c < "$local_f")
         if [ "$local_size" -gt 100000 ]; then
-            echo "  [OK] $abi/adb ($local_size bytes)"
+            echo "  [OK] $abi/libadb.so ($local_size bytes)"
         else
-            echo "  [BAD] $abi/adb ($local_size bytes - too small)"
+            echo "  [BAD] $abi/libadb.so ($local_size bytes - too small)"
             ALL_OK=false
         fi
     else
-        echo "  [MISSING] $abi/adb"
+        echo "  [MISSING] $abi/libadb.so"
         ALL_OK=false
     fi
 done
@@ -227,33 +232,33 @@ if [ "$ALL_OK" = false ]; then
     echo "  MISSING ADB BINARIES"
     echo "=========================================="
     echo ""
-    echo "ADB binaries for Android must be compiled for the target"
-    echo "architecture (ARM64/ARM/x86_64), NOT desktop Linux."
+    echo "ADB binaries must be compiled for Android (ARM64/ARM/x86_64)."
+    echo "They are named libadb.so and placed in jniLibs/ so Android"
+    echo "extracts them to nativeLibraryDir (which has exec permission)."
     echo ""
     echo "How to obtain them:"
     echo ""
     echo "  Option 1: Set download URL"
-    echo "    ADB_DOWNLOAD_URL=https://your-server/adb-binaries \\"
+    echo "    ADB_DOWNLOAD_URL=https://your-server/bins \\"
     echo "      ./scripts/download_adb_binaries.sh"
+    echo "    (expects files: \$URL/adb-aarch64, adb-arm, adb-x86_64)"
     echo ""
     echo "  Option 2: Set GitHub repo with releases"
-    echo "    ADB_GITHUB_REPO=user/repo ADB_RELEASE_TAG=v1.0 \\"
+    echo "    ADB_GITHUB_REPO=mofanx/adb ADB_RELEASE_TAG=v1.0 \\"
     echo "      ./scripts/download_adb_binaries.sh"
+    echo "    (expects release assets: adb-aarch64, adb-arm, adb-x86_64)"
     echo ""
     echo "  Option 3: Extract from Termux (on Android device)"
     echo "    pkg install android-tools"
-    echo "    cp \$(which adb) <path>/arm64-v8a/adb"
+    echo "    cp \$(which adb) <project>/app/src/main/jniLibs/arm64-v8a/libadb.so"
     echo ""
     echo "  Option 4: Place binaries manually"
     for abi in "${ABIS[@]}"; do
-        echo "    $ASSETS_BIN/$abi/adb"
+        echo "    $JNILIBS/$abi/libadb.so"
     done
-    echo ""
-    echo "  Option 5: Build from AOSP source with NDK"
-    echo "    See: https://android.googlesource.com/platform/packages/modules/adb/"
     echo ""
     exit 1
 fi
 
 echo ""
-echo "All binaries ready for APK bundling."
+echo "All binaries ready for APK bundling (jniLibs -> nativeLibraryDir)."

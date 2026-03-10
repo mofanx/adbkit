@@ -1,0 +1,4 @@
+# ADB/Fastboot binaries (downloaded during build, named as .so for Android packaging)
+*/libadb.so
+*/libfastboot.so
+!.gitkeep

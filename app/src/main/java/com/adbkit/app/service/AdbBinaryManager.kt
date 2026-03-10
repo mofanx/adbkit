@@ -4,98 +4,63 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
 import java.io.File
-import java.io.FileOutputStream
+import java.io.InputStreamReader
 
 object AdbBinaryManager {
 
     private const val TAG = "AdbBinaryManager"
-    private const val ADB_BINARY_NAME = "adb"
-    private const val FASTBOOT_BINARY_NAME = "fastboot"
 
-    var adbReady: Boolean = false
-        private set
+    // Binaries are packaged as .so in jniLibs/ so Android extracts them
+    // to nativeLibraryDir which has execute permission (unlike filesDir).
+    private const val ADB_LIB_NAME = "libadb.so"
+    private const val FASTBOOT_LIB_NAME = "libfastboot.so"
+
+    private val _adbReady = MutableStateFlow(false)
+    val adbReady: StateFlow<Boolean> = _adbReady.asStateFlow()
+
     var lastError: String = ""
         private set
 
-    private fun getBinDir(context: Context): File {
-        val dir = File(context.filesDir, "bin")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
-    }
-
-    private fun getAbi(): String {
-        return Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64-v8a"
+    private fun getNativeLibDir(context: Context): String {
+        return context.applicationInfo.nativeLibraryDir
     }
 
     suspend fun setup(context: Context): Pair<String, String> = withContext(Dispatchers.IO) {
         lastError = ""
-        val adbPath = setupBinary(context, ADB_BINARY_NAME)
-        val fastbootPath = setupBinary(context, FASTBOOT_BINARY_NAME)
+        val adbPath = findBinary(context, "adb", ADB_LIB_NAME)
+        val fastbootPath = findBinary(context, "fastboot", FASTBOOT_LIB_NAME)
 
-        // Verify adb is actually usable
-        adbReady = if (adbPath != ADB_BINARY_NAME) {
-            val file = File(adbPath)
-            val exists = file.exists()
-            val canExec = file.canExecute()
-            val sizeOk = file.length() > 100_000
-            Log.i(TAG, "ADB verify: path=$adbPath exists=$exists exec=$canExec size=${file.length()}")
-            if (!exists) lastError = "ADB binary not found at $adbPath"
-            else if (!canExec) lastError = "ADB binary not executable: $adbPath"
-            else if (!sizeOk) lastError = "ADB binary too small (${file.length()} bytes), likely corrupted"
-            exists && canExec && sizeOk
-        } else {
-            // Bare name fallback - test if adb is in PATH
-            try {
-                val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", "which adb"))
-                val exit = proc.waitFor()
-                if (exit == 0) {
-                    Log.i(TAG, "ADB found in PATH")
-                    true
-                } else {
-                    lastError = "ADB binary not bundled and not found in system PATH"
-                    Log.e(TAG, lastError)
-                    false
-                }
-            } catch (e: Exception) {
-                lastError = "ADB binary not available: ${e.message}"
-                Log.e(TAG, lastError)
-                false
-            }
+        // Verify adb is actually executable at runtime
+        val ready = verifyBinary(adbPath)
+        _adbReady.value = ready
+
+        Log.i(TAG, "Setup complete: adb=$adbPath (ready=$ready), fastboot=$fastbootPath")
+        if (!ready) {
+            Log.e(TAG, "ADB NOT READY: $lastError")
         }
-
-        Log.i(TAG, "Setup complete: adb=$adbPath (ready=$adbReady), fastboot=$fastbootPath")
         Pair(adbPath, fastbootPath)
     }
 
-    private fun setupBinary(context: Context, binaryName: String): String {
-        // 1. Check if already extracted and up-to-date
-        val binDir = getBinDir(context)
-        val extractedBinary = File(binDir, binaryName)
-        val versionFile = File(binDir, "${binaryName}.version")
-        val currentVersion = getAssetVersion(context, binaryName)
-
-        if (extractedBinary.exists() && extractedBinary.canExecute() && extractedBinary.length() > 100_000) {
-            val savedVersion = if (versionFile.exists()) versionFile.readText().trim() else ""
-            if (savedVersion == currentVersion) {
-                Log.i(TAG, "$binaryName: using cached ${extractedBinary.absolutePath}")
-                return extractedBinary.absolutePath
-            }
+    private fun findBinary(context: Context, binaryName: String, libName: String): String {
+        // 1. Check nativeLibraryDir (jniLibs packaging — has exec permission)
+        val nativeDir = getNativeLibDir(context)
+        val nativeFile = File(nativeDir, libName)
+        if (nativeFile.exists() && nativeFile.canExecute()) {
+            Log.i(TAG, "$binaryName: found in nativeLibraryDir: ${nativeFile.absolutePath} (${nativeFile.length()} bytes)")
+            return nativeFile.absolutePath
+        } else if (nativeFile.exists()) {
+            Log.w(TAG, "$binaryName: found in nativeLibraryDir but not executable: ${nativeFile.absolutePath}")
+        } else {
+            Log.w(TAG, "$binaryName: not found in nativeLibraryDir: ${nativeFile.absolutePath}")
         }
 
-        // 2. Try to extract from assets
-        val extracted = extractFromAssets(context, binaryName, extractedBinary)
-        if (extracted && extractedBinary.length() > 100_000) {
-            versionFile.writeText(currentVersion)
-            Log.i(TAG, "$binaryName: extracted from assets to ${extractedBinary.absolutePath}")
-            return extractedBinary.absolutePath
-        } else if (extracted) {
-            Log.w(TAG, "$binaryName: extracted but too small (${extractedBinary.length()} bytes)")
-            extractedBinary.delete()
-        }
-
-        // 3. Check system paths as fallback
+        // 2. Check system paths as fallback (for rooted devices or manual placement)
         val systemPaths = listOf(
             "/data/local/tmp/$binaryName",
             "/system/bin/$binaryName",
@@ -112,73 +77,67 @@ object AdbBinaryManager {
         }
 
         Log.w(TAG, "$binaryName: not found anywhere, falling back to bare name")
-        // 4. Fall back to bare name (hope it's in PATH)
         return binaryName
     }
 
-    private fun getAssetVersion(context: Context, binaryName: String): String {
+    /**
+     * Actually try to run the binary to verify it works.
+     * File.canExecute() can return true even on noexec filesystems.
+     */
+    private fun verifyBinary(adbPath: String): Boolean {
         return try {
-            val abi = getAbi()
-            val assets = context.assets.list("bin/$abi") ?: emptyArray()
-            if (assets.contains(binaryName)) {
-                context.packageManager.getPackageInfo(context.packageName, 0)
-                    .lastUpdateTime.toString()
-            } else ""
-        } catch (e: Exception) { "" }
-    }
-
-    private fun extractFromAssets(context: Context, binaryName: String, targetFile: File): Boolean {
-        val abi = getAbi()
-        // Try ABI-specific path first, then generic
-        val paths = listOf("bin/$abi/$binaryName", "bin/$binaryName")
-
-        for (assetPath in paths) {
-            try {
-                context.assets.open(assetPath).use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                targetFile.setExecutable(true, false)
-                targetFile.setReadable(true, false)
-                Log.i(TAG, "Extracted $assetPath -> ${targetFile.absolutePath} (${targetFile.length()} bytes)")
-                return true
-            } catch (e: Exception) {
-                Log.d(TAG, "Asset not found: $assetPath")
+            val proc = ProcessBuilder(adbPath, "version")
+                .redirectErrorStream(true)
+                .start()
+            val output = BufferedReader(InputStreamReader(proc.inputStream)).readText()
+            val exit = proc.waitFor()
+            if (exit == 0 && output.contains("Android Debug Bridge")) {
+                Log.i(TAG, "ADB verify OK: ${output.lines().firstOrNull()}")
+                true
+            } else {
+                lastError = "ADB binary returned exit=$exit: ${output.take(200)}"
+                Log.e(TAG, lastError)
+                false
             }
+        } catch (e: Exception) {
+            lastError = "ADB binary not executable: ${e.message}"
+            Log.e(TAG, lastError, e)
+            false
         }
-        return false
     }
 
     fun getStatus(context: Context): String {
-        val binDir = getBinDir(context)
-        val adbFile = File(binDir, ADB_BINARY_NAME)
-        val abi = getAbi()
+        val nativeDir = getNativeLibDir(context)
+        val adbFile = File(nativeDir, ADB_LIB_NAME)
+        val fastbootFile = File(nativeDir, FASTBOOT_LIB_NAME)
+        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
         return buildString {
             appendLine("ABI: $abi")
             appendLine("Supported ABIs: ${Build.SUPPORTED_ABIS.joinToString()}")
-            appendLine("Bin dir: ${binDir.absolutePath}")
-            appendLine("ADB ready: $adbReady")
+            appendLine("Native lib dir: $nativeDir")
+            appendLine("ADB ready: ${_adbReady.value}")
             if (lastError.isNotEmpty()) appendLine("Last error: $lastError")
             appendLine("Current ADB path: ${AdbService.getAdbPath()}")
+            appendLine("")
+            appendLine("=== Bundled binaries (jniLibs) ===")
+            appendLine("ADB ($ADB_LIB_NAME):")
             if (adbFile.exists()) {
-                appendLine("Extracted ADB: ${adbFile.absolutePath}")
-                appendLine("  executable: ${adbFile.canExecute()}")
+                appendLine("  path: ${adbFile.absolutePath}")
                 appendLine("  size: ${adbFile.length()} bytes")
+                appendLine("  canExecute: ${adbFile.canExecute()}")
             } else {
-                appendLine("Extracted ADB: not found")
+                appendLine("  NOT FOUND in nativeLibraryDir")
             }
-            // Check assets
-            try {
-                val abiAssets = context.assets.list("bin/$abi")
-                appendLine("Assets (bin/$abi): ${abiAssets?.joinToString() ?: "empty"}")
-                val genericAssets = context.assets.list("bin")
-                appendLine("Assets (bin/): ${genericAssets?.joinToString() ?: "empty"}")
-            } catch (e: Exception) {
-                appendLine("Assets: cannot read (${e.message})")
+            appendLine("Fastboot ($FASTBOOT_LIB_NAME):")
+            if (fastbootFile.exists()) {
+                appendLine("  path: ${fastbootFile.absolutePath}")
+                appendLine("  size: ${fastbootFile.length()} bytes")
+                appendLine("  canExecute: ${fastbootFile.canExecute()}")
+            } else {
+                appendLine("  NOT FOUND in nativeLibraryDir")
             }
-            // Check system paths
-            appendLine("System ADB search:")
+            appendLine("")
+            appendLine("=== System fallback paths ===")
             listOf("/data/local/tmp/adb", "/system/bin/adb", "/system/xbin/adb").forEach { path ->
                 val f = File(path)
                 val status = when {

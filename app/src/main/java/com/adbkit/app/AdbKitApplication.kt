@@ -23,13 +23,13 @@ class AdbKitApplication : Application() {
 
     private fun initAdbPath() {
         appScope.launch(Dispatchers.IO) {
-            // 1. Try to extract bundled binary first
+            // 1. Find and verify bundled ADB binary
             try {
                 val (adbPath, fastbootPath) = AdbBinaryManager.setup(instance)
                 AdbService.setAdbPath(adbPath)
                 AdbService.setFastbootPath(fastbootPath)
-                Log.i(TAG, "ADB path: $adbPath (ready=${AdbBinaryManager.adbReady})")
-                if (!AdbBinaryManager.adbReady) {
+                Log.i(TAG, "ADB path: $adbPath (ready=${AdbBinaryManager.adbReady.value})")
+                if (!AdbBinaryManager.adbReady.value) {
                     Log.e(TAG, "ADB NOT READY: ${AdbBinaryManager.lastError}")
                     Log.e(TAG, "Status:\n${AdbBinaryManager.getStatus(instance)}")
                 }
