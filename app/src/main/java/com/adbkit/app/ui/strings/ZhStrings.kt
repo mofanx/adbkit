@@ -22,6 +22,8 @@ object ZhStrings : AppStrings {
     override val execute = "执行"
     override val connect = "连接"
     override val disconnect = "断开"
+    override val disconnectConfirmTitle = "断开设备连接"
+    override val disconnectConfirmMessage = "确定要断开当前设备的连接吗？断开后将返回首页。"
     override val loading = "加载中..."
     override val noData = "暂无数据"
 
@@ -277,6 +279,7 @@ object ZhStrings : AppStrings {
     override val refreshRateMid = "中 (5fps)"
     override val refreshRateHigh = "高 (10fps)"
     override val refreshRateUltra = "极高 (20fps)"
+    override val maxFps = "最大帧率"
     override val aspectRatio = "画面比例"
     override val keepOriginal = "保持原始比例"
     override val adaptive = "自适应"

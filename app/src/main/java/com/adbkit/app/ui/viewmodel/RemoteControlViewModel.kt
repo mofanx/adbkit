@@ -1,21 +1,21 @@
 package com.adbkit.app.ui.viewmodel
 
 import android.graphics.Bitmap
+import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import com.adbkit.app.service.ScreenStreamService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class RemoteControlUiState(
-    val resolution: String = "auto",
+    val resolution: String = "720p",
     val bitrate: String = "8Mbps",
+    val maxFps: String = "30",
     val aspectRatio: String = "original",
     val navBarPosition: String = "floating",
     val fullscreen: Boolean = false,
@@ -27,10 +27,10 @@ data class RemoteControlUiState(
     val isError: Boolean = false,
     val screenWidth: Int = 1080,
     val screenHeight: Int = 1920,
-    val screenBitmap: Bitmap? = null,
     val fps: Int = 0,
-    val refreshInterval: Long = 200L,
-    val captureScale: Float = 1.0f,
+    val streamMode: String = "none",
+    // Fallback bitmap for screencap mode
+    val screenBitmap: Bitmap? = null,
     val bitmapWidth: Int = 0,
     val bitmapHeight: Int = 0
 )
@@ -39,12 +39,35 @@ class RemoteControlViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(RemoteControlUiState())
     val uiState: StateFlow<RemoteControlUiState> = _uiState.asStateFlow()
 
-    private var captureJob: Job? = null
-    private var frameCount = 0
-    private var lastFpsTime = 0L
+    val streamService = ScreenStreamService()
 
     init {
         loadScreenSize()
+        // Collect stream service state
+        viewModelScope.launch {
+            streamService.state.collect { streamState ->
+                _uiState.update {
+                    it.copy(
+                        fps = streamState.fps,
+                        streamMode = streamState.streamMode
+                    )
+                }
+            }
+        }
+        // Collect fallback bitmap
+        viewModelScope.launch {
+            streamService.screenshotBitmap.collect { bitmap ->
+                if (bitmap != null) {
+                    _uiState.update {
+                        it.copy(
+                            screenBitmap = bitmap,
+                            bitmapWidth = bitmap.width,
+                            bitmapHeight = bitmap.height
+                        )
+                    }
+                }
+            }
+        }
     }
 
     private fun loadScreenSize() {
@@ -67,26 +90,54 @@ class RemoteControlViewModel : ViewModel() {
 
     fun setResolution(value: String) { _uiState.update { it.copy(resolution = value) } }
     fun setBitrate(value: String) { _uiState.update { it.copy(bitrate = value) } }
+    fun setMaxFps(value: String) { _uiState.update { it.copy(maxFps = value) } }
     fun setAspectRatio(value: String) { _uiState.update { it.copy(aspectRatio = value) } }
     fun setNavBarPosition(value: String) { _uiState.update { it.copy(navBarPosition = value) } }
     fun setFullscreen(value: Boolean) { _uiState.update { it.copy(fullscreen = value) } }
     fun setScreenOff(value: Boolean) { _uiState.update { it.copy(screenOff = value) } }
     fun setCompatMode(value: Boolean) { _uiState.update { it.copy(compatMode = value) } }
 
-    fun setRefreshRate(rate: String) {
-        val interval = when {
-            rate.contains("2fps") -> 500L
-            rate.contains("5fps") -> 200L
-            rate.contains("10fps") -> 100L
-            rate.contains("20fps") -> 50L
-            else -> 200L
+    private fun parseResolution(): Pair<Int, Int> {
+        val state = _uiState.value
+        return when (state.resolution) {
+            "480p" -> Pair(480, (480 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
+            "720p" -> Pair(720, (720 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
+            "1080p" -> Pair(1080, (1080 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
+            "original" -> Pair(state.screenWidth, state.screenHeight)
+            else -> Pair(720, (720 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
         }
-        _uiState.update { it.copy(refreshInterval = interval) }
+    }
+
+    private fun parseBitrate(): Int {
+        return when (_uiState.value.bitrate) {
+            "2Mbps" -> 2_000_000
+            "4Mbps" -> 4_000_000
+            "8Mbps" -> 8_000_000
+            "16Mbps" -> 16_000_000
+            "32Mbps" -> 32_000_000
+            else -> 8_000_000
+        }
+    }
+
+    /**
+     * Start H.264 stream to a Surface (SurfaceView/TextureView).
+     * Called from the UI when the Surface is available.
+     */
+    fun startH264Stream(surface: Surface) {
+        val (w, h) = parseResolution()
+        val config = ScreenStreamService.StreamConfig(
+            width = w,
+            height = h,
+            bitrate = parseBitrate(),
+            maxFps = _uiState.value.maxFps.toIntOrNull() ?: 30,
+            useH264 = true
+        )
+        streamService.startStream(surface, config, viewModelScope)
     }
 
     fun startRemoteControl() {
         if (_uiState.value.isConnected) {
-            stopCapture()
+            stopStream()
             _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected", screenBitmap = null) }
             return
         }
@@ -110,7 +161,7 @@ class RemoteControlViewModel : ViewModel() {
                         isError = false
                     )
                 }
-                startCapture()
+                // Stream will be started when Surface becomes available in the UI
             } else {
                 _uiState.update {
                     it.copy(
@@ -123,39 +174,8 @@ class RemoteControlViewModel : ViewModel() {
         }
     }
 
-    private fun startCapture() {
-        captureJob?.cancel()
-        frameCount = 0
-        lastFpsTime = System.currentTimeMillis()
-        captureJob = viewModelScope.launch {
-            while (isActive && _uiState.value.isConnected) {
-                val bitmap = AdbService.captureScreenBitmap()
-                if (bitmap != null) {
-                    frameCount++
-                    val now = System.currentTimeMillis()
-                    val elapsed = now - lastFpsTime
-                    val fps = if (elapsed > 0) (frameCount * 1000 / elapsed).toInt() else 0
-                    if (elapsed > 2000) {
-                        frameCount = 0
-                        lastFpsTime = now
-                    }
-                    _uiState.update {
-                        it.copy(
-                            screenBitmap = bitmap,
-                            fps = fps,
-                            bitmapWidth = bitmap.width,
-                            bitmapHeight = bitmap.height
-                        )
-                    }
-                }
-                delay(_uiState.value.refreshInterval)
-            }
-        }
-    }
-
-    private fun stopCapture() {
-        captureJob?.cancel()
-        captureJob = null
+    fun stopStream() {
+        streamService.stopStream()
     }
 
     fun sendKey(keyCode: Int) {
@@ -166,14 +186,11 @@ class RemoteControlViewModel : ViewModel() {
 
     /**
      * Convert view ratio coordinates to actual device screen coordinates.
-     * Uses bitmap dimensions (actual screenshot size) which may differ from
-     * the reported screen size (wm size), ensuring 1:1 mapping accuracy.
      */
     private fun ratioToDeviceCoords(xRatio: Float, yRatio: Float): Pair<Int, Int> {
         val state = _uiState.value
-        // Use bitmap dimensions if available (most accurate), fallback to wm size
-        val w = if (state.bitmapWidth > 0) state.bitmapWidth else state.screenWidth
-        val h = if (state.bitmapHeight > 0) state.bitmapHeight else state.screenHeight
+        val w = state.screenWidth
+        val h = state.screenHeight
         val x = (xRatio.coerceIn(0f, 1f) * w).toInt()
         val y = (yRatio.coerceIn(0f, 1f) * h).toInt()
         return Pair(x, y)
@@ -183,7 +200,6 @@ class RemoteControlViewModel : ViewModel() {
         val (x, y) = ratioToDeviceCoords(xRatio, yRatio)
         viewModelScope.launch {
             if (_uiState.value.compatMode) {
-                // Compat mode: use shell input tap with sendevent fallback
                 val result = AdbService.inputTap(x, y)
                 if (!result.success) {
                     AdbService.shell("input touchscreen tap $x $y")
@@ -211,20 +227,16 @@ class RemoteControlViewModel : ViewModel() {
 
     fun sendTap() {
         val state = _uiState.value
-        val w = if (state.bitmapWidth > 0) state.bitmapWidth else state.screenWidth
-        val h = if (state.bitmapHeight > 0) state.bitmapHeight else state.screenHeight
         viewModelScope.launch {
-            AdbService.inputTap(w / 2, h / 2)
+            AdbService.inputTap(state.screenWidth / 2, state.screenHeight / 2)
         }
     }
 
     fun sendSwipe(direction: String) {
         val state = _uiState.value
-        val w = if (state.bitmapWidth > 0) state.bitmapWidth else state.screenWidth
-        val h = if (state.bitmapHeight > 0) state.bitmapHeight else state.screenHeight
-        val cx = w / 2
-        val cy = h / 2
-        val dist = h / 4
+        val cx = state.screenWidth / 2
+        val cy = state.screenHeight / 2
+        val dist = state.screenHeight / 4
         viewModelScope.launch {
             when (direction) {
                 "up" -> AdbService.inputSwipe(cx, cy + dist, cx, cy - dist)
@@ -237,6 +249,6 @@ class RemoteControlViewModel : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        stopCapture()
+        stopStream()
     }
 }

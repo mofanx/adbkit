@@ -288,7 +288,13 @@ object AdbService {
     }
 
     suspend fun installApp(apkPath: String): CommandResult {
-        return adb("install", "-r", "'$apkPath'")
+        // Use pm install for device-side paths (after adb push)
+        // Use adb install for host-side paths
+        return if (apkPath.startsWith("/")) {
+            shell("pm install -r '$apkPath'")
+        } else {
+            adb("install", "-r", apkPath)
+        }
     }
 
     suspend fun uninstallApp(packageName: String, keepData: Boolean = false): CommandResult {

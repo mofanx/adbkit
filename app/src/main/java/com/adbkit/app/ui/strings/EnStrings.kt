@@ -22,6 +22,8 @@ object EnStrings : AppStrings {
     override val execute = "Execute"
     override val connect = "Connect"
     override val disconnect = "Disconnect"
+    override val disconnectConfirmTitle = "Disconnect Device"
+    override val disconnectConfirmMessage = "Are you sure you want to disconnect? You will be returned to the home page."
     override val loading = "Loading..."
     override val noData = "No data"
 
@@ -277,6 +279,7 @@ object EnStrings : AppStrings {
     override val refreshRateMid = "Medium (5fps)"
     override val refreshRateHigh = "High (10fps)"
     override val refreshRateUltra = "Ultra (20fps)"
+    override val maxFps = "Max FPS"
     override val aspectRatio = "Aspect Ratio"
     override val keepOriginal = "Keep Original"
     override val adaptive = "Adaptive"

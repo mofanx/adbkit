@@ -26,6 +26,8 @@ interface AppStrings {
     val execute: String
     val connect: String
     val disconnect: String
+    val disconnectConfirmTitle: String
+    val disconnectConfirmMessage: String
     val loading: String
     val noData: String
 
@@ -291,6 +293,7 @@ interface AppStrings {
     val refreshRateMid: String
     val refreshRateHigh: String
     val refreshRateUltra: String
+    val maxFps: String
     val aspectRatio: String
     val keepOriginal: String
     val adaptive: String
