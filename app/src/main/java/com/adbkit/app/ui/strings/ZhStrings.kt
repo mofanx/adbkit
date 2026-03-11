@@ -376,6 +376,12 @@ object ZhStrings : AppStrings {
     override val usedMemory = "已用内存"
     override val freeMemory = "可用内存"
     override val processKilled = "进程已结束"
+    override val runningApps = "运行中应用"
+    override val allProcesses = "全部进程"
+    override val runningAppsCount = { count: Int -> "共 $count 个运行中应用" }
+
+    // Remote control - bitrate
+    override val bitrateControl = "码率控制"
 
     // Storage info
     override val storageInfo = "存储信息"

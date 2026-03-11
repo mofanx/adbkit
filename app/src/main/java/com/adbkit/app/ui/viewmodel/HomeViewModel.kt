@@ -11,10 +11,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 data class HomeUiState(
     val ipAddress: String = "",
@@ -127,44 +128,99 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    private fun getLocalIpAddress(): String? {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
+            for (intf in interfaces) {
+                if (!intf.isUp || intf.isLoopback) continue
+                val name = intf.name.lowercase()
+                if (!name.startsWith("wlan") && !name.startsWith("eth") && !name.startsWith("ap")) continue
+                for (addr in intf.inetAddresses) {
+                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return null
+    }
+
     fun scanDevices() {
         _uiState.update { it.copy(isScanning = true, scannedDevices = emptyList(), showScanDialog = true) }
         viewModelScope.launch {
-            val ipResult = AdbService.executeCommand("ip route | grep src | head -1")
-            val localIp = if (ipResult.success) {
-                "src\\s+(\\S+)".toRegex().find(ipResult.output)?.groupValues?.getOrNull(1) ?: ""
-            } else ""
+            val localIp = getLocalIpAddress()
 
-            if (localIp.isEmpty()) {
-                _uiState.update { it.copy(isScanning = false, statusMessage = "Cannot get local IP", isError = true) }
+            if (localIp.isNullOrEmpty()) {
+                _uiState.update { it.copy(isScanning = false, statusMessage = "Cannot get local IP, check WiFi connection", isError = true) }
                 return@launch
             }
 
             val subnet = localIp.substringBeforeLast(".")
-            val found = mutableListOf<String>()
+            val found = java.util.concurrent.CopyOnWriteArrayList<String>()
 
             withContext(Dispatchers.IO) {
-                // Scan common ADB ports on LAN
-                val jobs = (1..254).map { i ->
-                    async {
-                        val ip = "$subnet.$i"
-                        try {
-                            val sock = java.net.Socket()
-                            sock.connect(java.net.InetSocketAddress(ip, 5555), 200)
-                            sock.close()
-                            ip
-                        } catch (_: Exception) {
-                            null
+                // Phase 1: Try adb mdns discovery first (fastest & most reliable)
+                val mdnsResult = AdbService.executeCommand("${AdbService.getAdbPath()} mdns services 2>/dev/null || true")
+                if (mdnsResult.success && mdnsResult.output.isNotBlank()) {
+                    mdnsResult.output.lines().forEach { line ->
+                        val match = "(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)".toRegex().find(line)
+                        if (match != null) {
+                            found.add("${match.groupValues[1]}:${match.groupValues[2]}")
                         }
                     }
                 }
-                jobs.awaitAll().filterNotNull().forEach { found.add("$it:5555") }
+
+                // Phase 2: Scan all IPs on common ADB port 5555
+                val port5555Hosts = (1..254).map { i ->
+                    async {
+                        val ip = "$subnet.$i"
+                        if (ip == localIp) return@async null
+                        try {
+                            val sock = java.net.Socket()
+                            sock.connect(java.net.InetSocketAddress(ip, 5555), 300)
+                            sock.close()
+                            "$ip:5555"
+                        } catch (_: Exception) { null }
+                    }
+                }.awaitAll().filterNotNull()
+                port5555Hosts.forEach { if (it !in found) found.add(it) }
+
+                // Phase 3: For live hosts (responded on 5555 or from mdns),
+                // plus a quick ARP/ping sweep to find other hosts, then scan wireless debug ports
+                val knownHosts = found.map { it.substringBefore(":") }.toMutableSet()
+
+                // Quick ping sweep for additional hosts
+                val pingHosts = (1..254).map { i ->
+                    async {
+                        val ip = "$subnet.$i"
+                        if (ip == localIp || ip in knownHosts) return@async null
+                        try {
+                            if (java.net.InetAddress.getByName(ip).isReachable(200)) ip else null
+                        } catch (_: Exception) { null }
+                    }
+                }.awaitAll().filterNotNull()
+                knownHosts.addAll(pingHosts)
+
+                // For all known live hosts, scan wireless debug port range (37000-44000, step 100)
+                val wifiDebugJobs = knownHosts.flatMap { ip ->
+                    (37000..44000 step 100).map { port ->
+                        async {
+                            try {
+                                val sock = java.net.Socket()
+                                sock.connect(java.net.InetSocketAddress(ip, port), 200)
+                                sock.close()
+                                "$ip:$port"
+                            } catch (_: Exception) { null }
+                        }
+                    }
+                }
+                wifiDebugJobs.awaitAll().filterNotNull().forEach { if (it !in found) found.add(it) }
             }
 
             _uiState.update {
                 it.copy(
                     isScanning = false,
-                    scannedDevices = found,
+                    scannedDevices = found.distinct(),
                     statusMessage = if (found.isEmpty()) "No devices found on $subnet.0/24" else "Found ${found.size} device(s)",
                     isError = found.isEmpty()
                 )
@@ -177,7 +233,8 @@ class HomeViewModel : ViewModel() {
     }
 
     fun connectScannedDevice(address: String) {
-        _uiState.update { it.copy(ipAddress = address.substringBefore(":"), showScanDialog = false) }
+        // Keep full address (ip:port) so wireless debug ports are preserved
+        _uiState.update { it.copy(ipAddress = address, showScanDialog = false) }
         connectDevice()
     }
 

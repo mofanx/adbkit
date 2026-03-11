@@ -51,6 +51,25 @@ fun ProcessManagerScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Tab row: Running Apps / All Processes
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = uiState.showAppsOnly,
+                    onClick = { viewModel.setShowAppsOnly(true) },
+                    label = { Text(strings.runningApps) }
+                )
+                FilterChip(
+                    selected = !uiState.showAppsOnly,
+                    onClick = { viewModel.setShowAppsOnly(false) },
+                    label = { Text(strings.allProcesses) }
+                )
+            }
+
             // Search bar
             if (uiState.showSearch) {
                 OutlinedTextField(
@@ -123,31 +142,15 @@ fun ProcessManagerScreen(
                 }
             }
 
-            // Process count
-            Text(
-                text = strings.totalProcesses(uiState.filteredProcesses.size),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(strings.pid, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(60.dp))
-                Text(strings.memory, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.width(60.dp))
-                Text(strings.processName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(48.dp))
+            // Status message
+            if (uiState.statusMessage.isNotEmpty()) {
+                Text(
+                    text = uiState.statusMessage,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
             }
-
-            HorizontalDivider()
 
             if (uiState.isLoading) {
                 Box(
@@ -170,7 +173,52 @@ fun ProcessManagerScreen(
                         Button(onClick = { viewModel.refresh() }) { Text(strings.retry) }
                     }
                 }
+            } else if (uiState.showAppsOnly) {
+                // Running apps view
+                val apps = uiState.filteredApps
+                Text(
+                    text = strings.runningAppsCount(apps.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(apps) { app ->
+                        RunningAppCard(
+                            app = app,
+                            onForceStop = { viewModel.forceStopApp(app["name"] ?: "") },
+                            onKill = { viewModel.killProcess(app["pid"] ?: "") }
+                        )
+                    }
+                }
             } else {
+                // All processes view
+                Text(
+                    text = strings.totalProcesses(uiState.filteredProcesses.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(strings.pid, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(60.dp))
+                    Text(strings.memory, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.width(60.dp))
+                    Text(strings.processName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.width(48.dp))
+                }
+                HorizontalDivider()
                 LazyColumn(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -181,6 +229,64 @@ fun ProcessManagerScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun RunningAppCard(
+    app: Map<String, String>,
+    onForceStop: () -> Unit,
+    onKill: () -> Unit
+) {
+    val strings = LocalStrings.current
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = app["name"] ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "PID: ${app["pid"] ?: ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${strings.memory}: ${formatMemory(app["memory"] ?: "0")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            FilledTonalButton(
+                onClick = onForceStop,
+                modifier = Modifier.height(32.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            ) {
+                Text(strings.appForceStop, style = MaterialTheme.typography.labelSmall)
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(onClick = onKill, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = strings.killProcess,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }

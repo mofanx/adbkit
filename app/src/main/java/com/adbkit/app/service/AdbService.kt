@@ -71,7 +71,7 @@ object AdbService {
     }
 
     suspend fun adb(vararg args: String): CommandResult {
-        val device = currentDevice
+        val device = _currentDevice.value
         val cmd = buildString {
             append(adbPath)
             if (device != null) {
@@ -339,6 +339,47 @@ object AdbService {
         return shell("kill -9 $pid")
     }
 
+    suspend fun getRunningApps(): List<Map<String, String>> {
+        // Get running app processes with memory usage via dumpsys meminfo
+        val result = shell("dumpsys meminfo --local -s")
+        if (!result.success) return emptyList()
+        val apps = mutableListOf<Map<String, String>>()
+        // Parse "Total PSS by process:" section
+        var inSection = false
+        result.output.lines().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.startsWith("Total PSS by process:") || trimmed.startsWith("Total RAM by process:")) {
+                inSection = true
+                return@forEach
+            }
+            if (inSection && trimmed.isBlank()) {
+                inSection = false
+                return@forEach
+            }
+            if (inSection) {
+                // Format: "123,456K: com.example.app (pid 1234 / activities)"
+                // or "123,456K: com.example.app (pid 1234)"
+                val match = "^([\\d,]+)K:\\s+(\\S+)\\s+\\(pid\\s+(\\d+)".toRegex().find(trimmed)
+                if (match != null) {
+                    val memKbStr = match.groupValues[1].replace(",", "")
+                    val name = match.groupValues[2]
+                    val pid = match.groupValues[3]
+                    apps.add(mapOf(
+                        "name" to name,
+                        "pid" to pid,
+                        "memory" to memKbStr
+                    ))
+                }
+            }
+        }
+        return apps
+    }
+
+    suspend fun forceStopAndRefresh(packageName: String): CommandResult {
+        val result = forceStopApp(packageName)
+        return result
+    }
+
     suspend fun takeScreenshot(savePath: String): CommandResult {
         val remotePath = "/sdcard/screenshot_temp.png"
         val cap = shell("screencap -p $remotePath")
@@ -470,7 +511,7 @@ object AdbService {
 
     suspend fun captureScreenBitmap(): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            val device = currentDevice
+            val device = _currentDevice.value
             val cmd = buildString {
                 append(adbPath)
                 if (device != null) append(" -s $device")

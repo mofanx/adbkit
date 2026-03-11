@@ -376,6 +376,12 @@ object EnStrings : AppStrings {
     override val usedMemory = "Used Memory"
     override val freeMemory = "Free Memory"
     override val processKilled = "Process killed"
+    override val runningApps = "Running Apps"
+    override val allProcesses = "All Processes"
+    override val runningAppsCount = { count: Int -> "$count running app(s)" }
+
+    // Remote control - bitrate
+    override val bitrateControl = "Bitrate"
 
     // Storage info
     override val storageInfo = "Storage Info"

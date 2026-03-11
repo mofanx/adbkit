@@ -391,6 +391,12 @@ interface AppStrings {
     val usedMemory: String
     val freeMemory: String
     val processKilled: String
+    val runningApps: String
+    val allProcesses: String
+    val runningAppsCount: (Int) -> String
+
+    // Remote control - bitrate
+    val bitrateControl: String
 
     // Storage info
     val storageInfo: String

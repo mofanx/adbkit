@@ -58,6 +58,7 @@ private fun ScreenMirrorView(
     val strings = LocalStrings.current
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var dragStart by remember { mutableStateOf(Offset.Zero) }
+    var dragEnd by remember { mutableStateOf(Offset.Zero) }
     var showControls by remember { mutableStateOf(true) }
 
     Scaffold(
@@ -141,8 +142,19 @@ private fun ScreenMirrorView(
                             detectTapGestures(
                                 onTap = { offset ->
                                     if (viewSize.width > 0 && viewSize.height > 0) {
-                                        val xRatio = offset.x / viewSize.width
-                                        val yRatio = offset.y / viewSize.height
+                                        // Calculate image display area for ContentScale.Fit
+                                        val bw = uiState.bitmapWidth.takeIf { it > 0 } ?: viewSize.width
+                                        val bh = uiState.bitmapHeight.takeIf { it > 0 } ?: viewSize.height
+                                        val scale = minOf(
+                                            viewSize.width.toFloat() / bw,
+                                            viewSize.height.toFloat() / bh
+                                        )
+                                        val imgW = bw * scale
+                                        val imgH = bh * scale
+                                        val offsetX = (viewSize.width - imgW) / 2f
+                                        val offsetY = (viewSize.height - imgH) / 2f
+                                        val xRatio = ((offset.x - offsetX) / imgW).coerceIn(0f, 1f)
+                                        val yRatio = ((offset.y - offsetY) / imgH).coerceIn(0f, 1f)
                                         viewModel.sendTapAt(xRatio, yRatio)
                                     }
                                 },
@@ -153,18 +165,35 @@ private fun ScreenMirrorView(
                         }
                         .pointerInput(Unit) {
                             detectDragGestures(
-                                onDragStart = { offset -> dragStart = offset },
-                                onDragEnd = {},
-                                onDrag = { change, _ ->
-                                    val end = change.position
-                                    if (viewSize.width > 0 && viewSize.height > 0) {
-                                        val x1 = dragStart.x / viewSize.width
-                                        val y1 = dragStart.y / viewSize.height
-                                        val x2 = end.x / viewSize.width
-                                        val y2 = end.y / viewSize.height
-                                        viewModel.sendSwipeAt(x1, y1, x2, y2, 100)
-                                        dragStart = end
+                                onDragStart = { offset ->
+                                    dragStart = offset
+                                    dragEnd = offset
+                                },
+                                onDragEnd = {
+                                    if (dragStart != Offset.Zero && dragEnd != Offset.Zero && dragStart != dragEnd) {
+                                        if (viewSize.width > 0 && viewSize.height > 0) {
+                                            val bw = uiState.bitmapWidth.takeIf { it > 0 } ?: viewSize.width
+                                            val bh = uiState.bitmapHeight.takeIf { it > 0 } ?: viewSize.height
+                                            val scale = minOf(
+                                                viewSize.width.toFloat() / bw,
+                                                viewSize.height.toFloat() / bh
+                                            )
+                                            val imgW = bw * scale
+                                            val imgH = bh * scale
+                                            val ox = (viewSize.width - imgW) / 2f
+                                            val oy = (viewSize.height - imgH) / 2f
+                                            val x1 = ((dragStart.x - ox) / imgW).coerceIn(0f, 1f)
+                                            val y1 = ((dragStart.y - oy) / imgH).coerceIn(0f, 1f)
+                                            val x2 = ((dragEnd.x - ox) / imgW).coerceIn(0f, 1f)
+                                            val y2 = ((dragEnd.y - oy) / imgH).coerceIn(0f, 1f)
+                                            viewModel.sendSwipeAt(x1, y1, x2, y2, 300)
+                                        }
                                     }
+                                    dragStart = Offset.Zero
+                                    dragEnd = Offset.Zero
+                                },
+                                onDrag = { change, _ ->
+                                    dragEnd = change.position
                                 }
                             )
                         },
@@ -241,6 +270,14 @@ private fun SettingsView(
                         },
                         options = listOf(strings.refreshRateLow, strings.refreshRateMid, strings.refreshRateHigh, strings.refreshRateUltra),
                         onValueChange = { viewModel.setRefreshRate(it) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    SettingRow(
+                        label = strings.bitrateControl,
+                        value = uiState.bitrate,
+                        options = listOf("2Mbps", "4Mbps", "8Mbps", "16Mbps", "32Mbps"),
+                        onValueChange = { viewModel.setBitrate(it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

@@ -20,18 +20,25 @@ data class MemoryInfo(
 
 data class ProcessManagerUiState(
     val processes: List<Map<String, String>> = emptyList(),
+    val runningApps: List<Map<String, String>> = emptyList(),
     val isLoading: Boolean = false,
     val error: String = "",
     val searchQuery: String = "",
     val showSearch: Boolean = false,
     val statusMessage: String = "",
-    val memoryInfo: MemoryInfo = MemoryInfo()
+    val memoryInfo: MemoryInfo = MemoryInfo(),
+    val showAppsOnly: Boolean = true
 ) {
     val filteredProcesses: List<Map<String, String>>
         get() = if (searchQuery.isEmpty()) processes
         else processes.filter {
             (it["name"] ?: "").contains(searchQuery, ignoreCase = true) ||
             (it["pid"] ?: "").contains(searchQuery)
+        }
+    val filteredApps: List<Map<String, String>>
+        get() = if (searchQuery.isEmpty()) runningApps
+        else runningApps.filter {
+            (it["name"] ?: "").contains(searchQuery, ignoreCase = true)
         }
 }
 
@@ -48,12 +55,17 @@ class ProcessManagerViewModel : ViewModel() {
             _uiState.update { it.copy(error = "No device connected", isLoading = false) }
             return
         }
-        _uiState.update { it.copy(isLoading = true, error = "") }
+        _uiState.update { it.copy(isLoading = true, error = "", statusMessage = "") }
         viewModelScope.launch {
             try {
-                val processes = AdbService.getProcessList()
                 val memInfo = loadMemoryInfo()
-                _uiState.update { it.copy(processes = processes, isLoading = false, memoryInfo = memInfo) }
+                if (_uiState.value.showAppsOnly) {
+                    val apps = AdbService.getRunningApps()
+                    _uiState.update { it.copy(runningApps = apps, isLoading = false, memoryInfo = memInfo) }
+                } else {
+                    val processes = AdbService.getProcessList()
+                    _uiState.update { it.copy(processes = processes, isLoading = false, memoryInfo = memInfo) }
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
             }
@@ -80,6 +92,11 @@ class ProcessManagerViewModel : ViewModel() {
         return MemoryInfo(totalKb = total, freeKb = free, availableKb = available)
     }
 
+    fun setShowAppsOnly(value: Boolean) {
+        _uiState.update { it.copy(showAppsOnly = value) }
+        refresh()
+    }
+
     fun toggleSearch() {
         _uiState.update { it.copy(showSearch = !it.showSearch, searchQuery = "") }
     }
@@ -92,9 +109,23 @@ class ProcessManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.killProcess(pid)
             if (result.success) {
+                _uiState.update { it.copy(statusMessage = "Process killed") }
                 refresh()
             } else {
                 _uiState.update { it.copy(statusMessage = "Kill failed: ${result.error}") }
+            }
+        }
+    }
+
+    fun forceStopApp(packageName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "Stopping $packageName...") }
+            val result = AdbService.forceStopApp(packageName)
+            if (result.success) {
+                _uiState.update { it.copy(statusMessage = "$packageName stopped") }
+                refresh()
+            } else {
+                _uiState.update { it.copy(statusMessage = "Stop failed: ${result.error}") }
             }
         }
     }

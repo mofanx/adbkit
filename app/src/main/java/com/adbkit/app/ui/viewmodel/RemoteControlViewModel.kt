@@ -29,7 +29,10 @@ data class RemoteControlUiState(
     val screenHeight: Int = 1920,
     val screenBitmap: Bitmap? = null,
     val fps: Int = 0,
-    val refreshInterval: Long = 200L
+    val refreshInterval: Long = 200L,
+    val captureScale: Float = 1.0f,
+    val bitmapWidth: Int = 0,
+    val bitmapHeight: Int = 0
 )
 
 class RemoteControlViewModel : ViewModel() {
@@ -136,7 +139,14 @@ class RemoteControlViewModel : ViewModel() {
                         frameCount = 0
                         lastFpsTime = now
                     }
-                    _uiState.update { it.copy(screenBitmap = bitmap, fps = fps) }
+                    _uiState.update {
+                        it.copy(
+                            screenBitmap = bitmap,
+                            fps = fps,
+                            bitmapWidth = bitmap.width,
+                            bitmapHeight = bitmap.height
+                        )
+                    }
                 }
                 delay(_uiState.value.refreshInterval)
             }
@@ -154,42 +164,67 @@ class RemoteControlViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Convert view ratio coordinates to actual device screen coordinates.
+     * Uses bitmap dimensions (actual screenshot size) which may differ from
+     * the reported screen size (wm size), ensuring 1:1 mapping accuracy.
+     */
+    private fun ratioToDeviceCoords(xRatio: Float, yRatio: Float): Pair<Int, Int> {
+        val state = _uiState.value
+        // Use bitmap dimensions if available (most accurate), fallback to wm size
+        val w = if (state.bitmapWidth > 0) state.bitmapWidth else state.screenWidth
+        val h = if (state.bitmapHeight > 0) state.bitmapHeight else state.screenHeight
+        val x = (xRatio.coerceIn(0f, 1f) * w).toInt()
+        val y = (yRatio.coerceIn(0f, 1f) * h).toInt()
+        return Pair(x, y)
+    }
+
     fun sendTapAt(xRatio: Float, yRatio: Float) {
-        val w = _uiState.value.screenWidth
-        val h = _uiState.value.screenHeight
-        val x = (xRatio * w).toInt()
-        val y = (yRatio * h).toInt()
+        val (x, y) = ratioToDeviceCoords(xRatio, yRatio)
         viewModelScope.launch {
-            AdbService.inputTap(x, y)
+            if (_uiState.value.compatMode) {
+                // Compat mode: use shell input tap with sendevent fallback
+                val result = AdbService.inputTap(x, y)
+                if (!result.success) {
+                    AdbService.shell("input touchscreen tap $x $y")
+                }
+            } else {
+                AdbService.inputTap(x, y)
+            }
         }
     }
 
     fun sendSwipeAt(x1Ratio: Float, y1Ratio: Float, x2Ratio: Float, y2Ratio: Float, duration: Int = 300) {
-        val w = _uiState.value.screenWidth
-        val h = _uiState.value.screenHeight
+        val (x1, y1) = ratioToDeviceCoords(x1Ratio, y1Ratio)
+        val (x2, y2) = ratioToDeviceCoords(x2Ratio, y2Ratio)
         viewModelScope.launch {
-            AdbService.inputSwipe(
-                (x1Ratio * w).toInt(), (y1Ratio * h).toInt(),
-                (x2Ratio * w).toInt(), (y2Ratio * h).toInt(),
-                duration
-            )
+            if (_uiState.value.compatMode) {
+                val result = AdbService.inputSwipe(x1, y1, x2, y2, duration)
+                if (!result.success) {
+                    AdbService.shell("input touchscreen swipe $x1 $y1 $x2 $y2 $duration")
+                }
+            } else {
+                AdbService.inputSwipe(x1, y1, x2, y2, duration)
+            }
         }
     }
 
     fun sendTap() {
-        val w = _uiState.value.screenWidth
-        val h = _uiState.value.screenHeight
+        val state = _uiState.value
+        val w = if (state.bitmapWidth > 0) state.bitmapWidth else state.screenWidth
+        val h = if (state.bitmapHeight > 0) state.bitmapHeight else state.screenHeight
         viewModelScope.launch {
             AdbService.inputTap(w / 2, h / 2)
         }
     }
 
     fun sendSwipe(direction: String) {
-        val w = _uiState.value.screenWidth
-        val h = _uiState.value.screenHeight
+        val state = _uiState.value
+        val w = if (state.bitmapWidth > 0) state.bitmapWidth else state.screenWidth
+        val h = if (state.bitmapHeight > 0) state.bitmapHeight else state.screenHeight
         val cx = w / 2
         val cy = h / 2
-        val dist = 300
+        val dist = h / 4
         viewModelScope.launch {
             when (direction) {
                 "up" -> AdbService.inputSwipe(cx, cy + dist, cx, cy - dist)
