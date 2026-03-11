@@ -328,6 +328,9 @@ interface AppStrings {
     val confirmDangerousDesc: String
     val appearanceSettings: String
     val darkMode: String
+    val darkModeSystem: String
+    val darkModeLight: String
+    val darkModeDark: String
     val dynamicColor: String
     val dynamicColorDesc: String
     val languageSettings: String
@@ -349,4 +352,50 @@ interface AppStrings {
     val adbUnavailable: (String) -> String
     val adbFound: (String, String) -> String
     val adbNotFound: String
+
+    // History & Scan
+    val noHistory: String
+    val scanningLan: String
+    val scanResult: (Int) -> String
+    val noDevicesFound: String
+    val scanLan: String
+
+    // Device click target settings
+    val deviceClickTarget: String
+    val deviceClickTargetDesc: String
+
+    // Sidebar device info
+    val currentDevice: String
+    val noDeviceConnected: String
+
+    // File management
+    val upload: String
+    val uploadFile: String
+    val downloading: String
+    val uploading: String
+    val downloadSuccess: String
+    val uploadSuccess: String
+    val downloadFailed: String
+    val uploadFailed: String
+
+    // App management
+    val installApk: String
+    val selectApk: String
+    val installing: String
+    val installSuccess: String
+    val installFailed: String
+
+    // Process management
+    val memoryUsage: String
+    val totalMemory: String
+    val usedMemory: String
+    val freeMemory: String
+    val processKilled: String
+
+    // Storage info
+    val storageInfo: String
+    val internalStorage: String
+    val storageUsed: String
+    val storageFree: String
+    val storageTotal: String
 }

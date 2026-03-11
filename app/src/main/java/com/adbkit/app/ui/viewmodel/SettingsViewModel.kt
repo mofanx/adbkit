@@ -14,7 +14,7 @@ data class SettingsUiState(
     val fastbootPath: String = "fastboot",
     val defaultPort: String = "5555",
     val autoConnect: Boolean = true,
-    val darkMode: Boolean = false,
+    val darkMode: String = "system",
     val dynamicColor: Boolean = true,
     val keepScreenOn: Boolean = false,
     val confirmDangerous: Boolean = true,
@@ -69,7 +69,7 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.setAutoConnect(value) }
     }
 
-    fun setDarkMode(value: Boolean) {
+    fun setDarkMode(value: String) {
         _uiState.update { it.copy(darkMode = value) }
         viewModelScope.launch { repo.setDarkMode(value) }
     }
@@ -102,12 +102,13 @@ class SettingsViewModel : ViewModel() {
     fun checkAdbAvailability() {
         _uiState.update { it.copy(isCheckingAdb = true, adbStatus = "") }
         viewModelScope.launch {
-            val path = _uiState.value.adbPath
-            val result = AdbService.executeCommand("$path version")
+            // Use actual ADB path (could be libadb.so from nativeLibraryDir)
+            val actualPath = AdbService.getAdbPath()
+            val result = AdbService.executeCommand("$actualPath version")
             val status = if (result.success) {
                 "✓ ADB OK: ${result.output.lines().firstOrNull() ?: ""}"
             } else {
-                "✗ ADB Error: ${result.error.ifEmpty { "not found" }}"
+                "✗ ADB Error: ${result.error.lines().firstOrNull()?.take(100) ?: "not found"}"
             }
             _uiState.update {
                 it.copy(isCheckingAdb = false, adbStatus = status, adbReady = result.success)

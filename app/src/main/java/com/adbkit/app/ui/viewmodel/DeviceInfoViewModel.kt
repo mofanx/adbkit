@@ -13,10 +13,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+data class StorageInfo(
+    val totalBytes: Long = 0,
+    val usedBytes: Long = 0,
+    val availableBytes: Long = 0
+) {
+    val usedPercent: Float get() = if (totalBytes > 0) usedBytes.toFloat() / totalBytes else 0f
+}
+
 data class DeviceInfoUiState(
     val deviceInfo: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
-    val error: String = ""
+    val error: String = "",
+    val storageInfo: StorageInfo = StorageInfo()
 )
 
 class DeviceInfoViewModel : ViewModel() {
@@ -36,11 +45,29 @@ class DeviceInfoViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val info = AdbService.getDeviceInfo()
-                _uiState.update { it.copy(deviceInfo = info, isLoading = false) }
+                val storage = loadStorageInfo()
+                _uiState.update { it.copy(deviceInfo = info, isLoading = false, storageInfo = storage) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Failed to get info", isLoading = false) }
             }
         }
+    }
+
+    private suspend fun loadStorageInfo(): StorageInfo {
+        val result = AdbService.shell("df /data | tail -1")
+        if (!result.success) return StorageInfo()
+        // df output: Filesystem 1K-blocks Used Available Use% Mounted on
+        val parts = result.output.trim().split("\\s+".toRegex())
+        if (parts.size < 4) return StorageInfo()
+        // Values are in 1K blocks
+        val totalKb = parts[1].toLongOrNull() ?: 0
+        val usedKb = parts[2].toLongOrNull() ?: 0
+        val availKb = parts[3].toLongOrNull() ?: 0
+        return StorageInfo(
+            totalBytes = totalKb * 1024,
+            usedBytes = usedKb * 1024,
+            availableBytes = availKb * 1024
+        )
     }
 
     fun copyAll() {

@@ -1,5 +1,9 @@
 package com.adbkit.app.ui.screens
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,12 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.AppManagerViewModel
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +33,35 @@ fun AppManagerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+    val context = LocalContext.current
+
+    // APK file picker
+    val apkPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val cursor = context.contentResolver.query(it, null, null, null, null)
+            val fileName = cursor?.use { c ->
+                if (c.moveToFirst()) {
+                    val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) c.getString(idx) else null
+                } else null
+            } ?: "install_${System.currentTimeMillis()}.apk"
+
+            val cacheFile = File(context.cacheDir, fileName)
+            context.contentResolver.openInputStream(it)?.use { input ->
+                cacheFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            viewModel.installApk(cacheFile.absolutePath)
+        }
+    }
+
+    LaunchedEffect(uiState.requestApkPick) {
+        if (uiState.requestApkPick) {
+            viewModel.onApkPickHandled()
+            apkPickerLauncher.launch("application/vnd.android.package-archive")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -38,6 +73,9 @@ fun AppManagerScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.requestInstallApk() }) {
+                        Icon(Icons.Filled.InstallMobile, contentDescription = strings.installApk)
+                    }
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
                     }

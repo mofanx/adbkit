@@ -12,13 +12,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.adbkit.app.ui.AdbKitApp
-import com.adbkit.app.ui.theme.AdbKitTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -35,14 +30,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestStoragePermissions()
         setContent {
-            AdbKitTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    AdbKitApp()
-                }
-            }
+            // Theme is applied inside AdbKitApp with user settings
+            AdbKitApp()
         }
     }
 

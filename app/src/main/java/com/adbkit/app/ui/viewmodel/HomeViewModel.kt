@@ -2,12 +2,19 @@ package com.adbkit.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.service.AdbService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class HomeUiState(
     val ipAddress: String = "",
@@ -17,19 +24,50 @@ data class HomeUiState(
     val statusMessage: String = "",
     val isError: Boolean = false,
     val showPairDialog: Boolean = false,
-    val showMoreMenu: Boolean = false
+    val showMoreMenu: Boolean = false,
+    val connectionHistory: List<String> = emptyList(),
+    val showHistoryDropdown: Boolean = false,
+    val isScanning: Boolean = false,
+    val showScanDialog: Boolean = false,
+    val scannedDevices: List<String> = emptyList()
 )
 
 class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val repo = SettingsRepository(AdbKitApplication.instance)
 
     init {
         refreshDevices()
+        loadHistory()
+    }
+
+    private fun loadHistory() {
+        viewModelScope.launch {
+            repo.connectionHistory.collect { history ->
+                _uiState.update { it.copy(connectionHistory = history) }
+            }
+        }
     }
 
     fun updateIpAddress(ip: String) {
         _uiState.update { it.copy(ipAddress = ip) }
+    }
+
+    fun toggleHistoryDropdown() {
+        _uiState.update { it.copy(showHistoryDropdown = !it.showHistoryDropdown) }
+    }
+
+    fun dismissHistoryDropdown() {
+        _uiState.update { it.copy(showHistoryDropdown = false) }
+    }
+
+    fun selectHistory(address: String) {
+        _uiState.update { it.copy(ipAddress = address, showHistoryDropdown = false) }
+    }
+
+    fun removeHistory(address: String) {
+        viewModelScope.launch { repo.removeConnectionHistory(address) }
     }
 
     fun connectDevice() {
@@ -44,6 +82,7 @@ class HomeViewModel : ViewModel() {
             val result = AdbService.connect(address)
             if (result.success && result.output.contains("connected")) {
                 AdbService.setCurrentDevice(address)
+                repo.addConnectionHistory(address)
                 refreshDevices()
                 _uiState.update {
                     it.copy(
@@ -78,7 +117,7 @@ class HomeViewModel : ViewModel() {
 
     fun selectDevice(device: String) {
         AdbService.setCurrentDevice(device)
-        _uiState.update { it.copy(selectedDevice = device, statusMessage = "Selected $device") }
+        _uiState.update { it.copy(selectedDevice = device) }
     }
 
     fun refreshDevices() {
@@ -89,21 +128,57 @@ class HomeViewModel : ViewModel() {
     }
 
     fun scanDevices() {
-        _uiState.update { it.copy(statusMessage = "Scanning...", isError = false) }
+        _uiState.update { it.copy(isScanning = true, scannedDevices = emptyList(), showScanDialog = true) }
         viewModelScope.launch {
-            // Get local IP range
             val ipResult = AdbService.executeCommand("ip route | grep src | head -1")
             val localIp = if (ipResult.success) {
                 "src\\s+(\\S+)".toRegex().find(ipResult.output)?.groupValues?.getOrNull(1) ?: ""
             } else ""
 
-            if (localIp.isNotEmpty()) {
-                val subnet = localIp.substringBeforeLast(".")
-                _uiState.update { it.copy(ipAddress = subnet, statusMessage = "Subnet: $subnet.0/24") }
-            } else {
-                _uiState.update { it.copy(statusMessage = "Cannot get local IP", isError = true) }
+            if (localIp.isEmpty()) {
+                _uiState.update { it.copy(isScanning = false, statusMessage = "Cannot get local IP", isError = true) }
+                return@launch
+            }
+
+            val subnet = localIp.substringBeforeLast(".")
+            val found = mutableListOf<String>()
+
+            withContext(Dispatchers.IO) {
+                // Scan common ADB ports on LAN
+                val jobs = (1..254).map { i ->
+                    async {
+                        val ip = "$subnet.$i"
+                        try {
+                            val sock = java.net.Socket()
+                            sock.connect(java.net.InetSocketAddress(ip, 5555), 200)
+                            sock.close()
+                            ip
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                }
+                jobs.awaitAll().filterNotNull().forEach { found.add("$it:5555") }
+            }
+
+            _uiState.update {
+                it.copy(
+                    isScanning = false,
+                    scannedDevices = found,
+                    statusMessage = if (found.isEmpty()) "No devices found on $subnet.0/24" else "Found ${found.size} device(s)",
+                    isError = found.isEmpty()
+                )
             }
         }
+    }
+
+    fun dismissScanDialog() {
+        _uiState.update { it.copy(showScanDialog = false) }
+    }
+
+    fun connectScannedDevice(address: String) {
+        _uiState.update { it.copy(ipAddress = address.substringBefore(":"), showScanDialog = false) }
+        connectDevice()
     }
 
     fun togglePairDialog() {

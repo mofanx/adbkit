@@ -2,14 +2,20 @@ package com.adbkit.app.service
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.adbkit.app.AdbKitApplication
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
 object AdbService {
 
-    private var currentDevice: String? = null
+    private val _currentDevice = MutableStateFlow<String?>(null)
+    val currentDevice: StateFlow<String?> = _currentDevice.asStateFlow()
+    
     private var adbPath: String = "adb"
     private var fastbootPath: String = "fastboot"
 
@@ -26,14 +32,25 @@ object AdbService {
     fun getFastbootPath(): String = fastbootPath
 
     fun setCurrentDevice(address: String?) {
-        currentDevice = address
+        _currentDevice.value = address
     }
 
-    fun getCurrentDevice(): String? = currentDevice
+    fun getCurrentDevice(): String? = _currentDevice.value
+
+    /**
+     * Get HOME directory for ADB server.
+     * ADB needs $HOME/.android for auth keys. The default /data is not writable.
+     */
+    private fun getAdbHome(): String {
+        return AdbKitApplication.instance.filesDir.absolutePath
+    }
 
     suspend fun executeCommand(command: String): CommandResult = withContext(Dispatchers.IO) {
         try {
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            val pb = ProcessBuilder("sh", "-c", command)
+            pb.environment()["HOME"] = getAdbHome()
+            pb.environment()["TMPDIR"] = AdbKitApplication.instance.cacheDir.absolutePath
+            val process = pb.start()
             val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText()
             val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText()
             val exitCode = process.waitFor()
@@ -459,7 +476,10 @@ object AdbService {
                 if (device != null) append(" -s $device")
                 append(" exec-out screencap -p")
             }
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+            val pb = ProcessBuilder("sh", "-c", cmd)
+            pb.environment()["HOME"] = getAdbHome()
+            pb.environment()["TMPDIR"] = AdbKitApplication.instance.cacheDir.absolutePath
+            val process = pb.start()
             val bytes = process.inputStream.readBytes()
             process.waitFor()
             if (bytes.size > 100) {

@@ -300,7 +300,7 @@ object EnStrings : AppStrings {
     // Settings
     override val adbConfig = "ADB Configuration"
     override val adbPath = "ADB Path"
-    override val adbPathHint = "Default \"adb\", or specify full path like /data/local/tmp/adb"
+    override val adbPathHint = "Default \"adb\", or specify full path like /data/local/tmp/adb (requires root)"
     override val detect = "Detect"
     override val autoDetect = "Auto Detect"
     override val fastbootPath = "Fastboot Path"
@@ -314,6 +314,9 @@ object EnStrings : AppStrings {
     override val confirmDangerousDesc = "Confirm before uninstall, reboot, erase, etc."
     override val appearanceSettings = "Appearance"
     override val darkMode = "Dark Mode"
+    override val darkModeSystem = "System"
+    override val darkModeLight = "Light"
+    override val darkModeDark = "Dark"
     override val dynamicColor = "Dynamic Color (Material You)"
     override val dynamicColorDesc = "Android 12+ theme colors from wallpaper"
     override val languageSettings = "Language"
@@ -334,4 +337,50 @@ object EnStrings : AppStrings {
     override val adbUnavailable = { error: String -> "✗ ADB unavailable: $error" }
     override val adbFound = { path: String, info: String -> "✓ Found: $path\n$info" }
     override val adbNotFound = "✗ No ADB binary found"
+
+    // History & Scan
+    override val noHistory = "No history"
+    override val scanningLan = "Scanning LAN..."
+    override val scanResult = { count: Int -> "Found $count device(s)" }
+    override val noDevicesFound = "No devices found"
+    override val scanLan = "Scan LAN"
+
+    // Device click target
+    override val deviceClickTarget = "Device click target"
+    override val deviceClickTargetDesc = "Target page when clicking device in list"
+
+    // Sidebar device info
+    override val currentDevice = "Current Device"
+    override val noDeviceConnected = "No device connected"
+
+    // File management
+    override val upload = "Upload"
+    override val uploadFile = "Upload File"
+    override val downloading = "Downloading..."
+    override val uploading = "Uploading..."
+    override val downloadSuccess = "Download successful"
+    override val uploadSuccess = "Upload successful"
+    override val downloadFailed = "Download failed"
+    override val uploadFailed = "Upload failed"
+
+    // App management
+    override val installApk = "Install APK"
+    override val selectApk = "Select APK File"
+    override val installing = "Installing..."
+    override val installSuccess = "Install successful"
+    override val installFailed = "Install failed"
+
+    // Process management
+    override val memoryUsage = "Memory Usage"
+    override val totalMemory = "Total Memory"
+    override val usedMemory = "Used Memory"
+    override val freeMemory = "Free Memory"
+    override val processKilled = "Process killed"
+
+    // Storage info
+    override val storageInfo = "Storage Info"
+    override val internalStorage = "Internal Storage"
+    override val storageUsed = "Used"
+    override val storageFree = "Free"
+    override val storageTotal = "Total"
 }

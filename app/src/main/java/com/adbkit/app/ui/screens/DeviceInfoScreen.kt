@@ -3,6 +3,7 @@ package com.adbkit.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -87,6 +88,66 @@ fun DeviceInfoScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
+                // Storage usage card
+                if (uiState.storageInfo.totalBytes > 0) {
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = strings.storageInfo,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "${formatBytes(uiState.storageInfo.usedBytes)} / ${formatBytes(uiState.storageInfo.totalBytes)}",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    progress = { uiState.storageInfo.usedPercent },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(10.dp),
+                                    color = when {
+                                        uiState.storageInfo.usedPercent > 0.9f -> MaterialTheme.colorScheme.error
+                                        uiState.storageInfo.usedPercent > 0.75f -> MaterialTheme.colorScheme.tertiary
+                                        else -> MaterialTheme.colorScheme.primary
+                                    },
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "${strings.storageUsed}: ${formatBytes(uiState.storageInfo.usedBytes)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${strings.storageFree}: ${formatBytes(uiState.storageInfo.availableBytes)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Internal key -> localized label mapping
                 val keyLabels = mapOf(
                     "model" to strings.diModel,
@@ -196,5 +257,14 @@ fun InfoRow(label: String, value: String) {
                 modifier = Modifier.weight(0.6f)
             )
         }
+    }
+}
+
+private fun formatBytes(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "${bytes}B"
+        bytes < 1024 * 1024 -> "${"%.1f".format(bytes / 1024.0)}KB"
+        bytes < 1024L * 1024 * 1024 -> "${"%.1f".format(bytes / (1024.0 * 1024))}MB"
+        else -> "${"%.2f".format(bytes / (1024.0 * 1024 * 1024))}GB"
     }
 }

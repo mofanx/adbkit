@@ -79,7 +79,7 @@ fun SettingsScreen(
                                 else MaterialTheme.colorScheme.onErrorContainer
                             )
                             Text(
-                                text = "Path: ${uiState.adbPath}",
+                                text = "Path: ${com.adbkit.app.service.AdbService.getAdbPath()}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (uiState.adbReady)
                                     MaterialTheme.colorScheme.onPrimaryContainer
@@ -204,11 +204,32 @@ fun SettingsScreen(
 
             // Appearance settings
             SettingsSection(title = strings.appearanceSettings) {
-                SettingsSwitch(
-                    label = strings.darkMode,
-                    checked = uiState.darkMode,
-                    onCheckedChange = { viewModel.setDarkMode(it) }
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = strings.darkMode, style = MaterialTheme.typography.bodyMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = uiState.darkMode == "system",
+                            onClick = { viewModel.setDarkMode("system") },
+                            label = { Text(strings.darkModeSystem) }
+                        )
+                        FilterChip(
+                            selected = uiState.darkMode == "light",
+                            onClick = { viewModel.setDarkMode("light") },
+                            label = { Text(strings.darkModeLight) }
+                        )
+                        FilterChip(
+                            selected = uiState.darkMode == "dark",
+                            onClick = { viewModel.setDarkMode("dark") },
+                            label = { Text(strings.darkModeDark) }
+                        )
+                    }
+                }
                 SettingsSwitch(
                     label = strings.dynamicColor,
                     description = strings.dynamicColorDesc,

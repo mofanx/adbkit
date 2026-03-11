@@ -1,5 +1,6 @@
 package com.adbkit.app.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.service.AdbBinaryManager
@@ -24,6 +26,7 @@ fun HomeScreen(
     onMenuClick: () -> Unit,
     onNavigateToFastboot: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onDeviceClick: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -40,9 +43,6 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.refreshDevices() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
-                    }
                     IconButton(onClick = { viewModel.togglePairDialog() }) {
                         Icon(Icons.Filled.Link, contentDescription = strings.pair)
                     }
@@ -135,21 +135,69 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // IP Address input
-            OutlinedTextField(
-                value = uiState.ipAddress,
-                onValueChange = { viewModel.updateIpAddress(it) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("192.168.1.100") },
-                leadingIcon = { Icon(Icons.Filled.History, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = { viewModel.scanDevices() }) {
-                        Icon(Icons.Filled.Search, contentDescription = strings.scan)
+            // IP Address input with history dropdown
+            Box {
+                OutlinedTextField(
+                    value = uiState.ipAddress,
+                    onValueChange = { viewModel.updateIpAddress(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("192.168.1.100") },
+                    leadingIcon = {
+                        IconButton(onClick = { viewModel.toggleHistoryDropdown() }) {
+                            Icon(Icons.Filled.History, contentDescription = null)
+                        }
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { viewModel.scanDevices() }) {
+                            if (uiState.isScanning) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Filled.Search, contentDescription = strings.scan)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp)
+                )
+
+                // History dropdown
+                DropdownMenu(
+                    expanded = uiState.showHistoryDropdown,
+                    onDismissRequest = { viewModel.dismissHistoryDropdown() }
+                ) {
+                    if (uiState.connectionHistory.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text(strings.noHistory, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            onClick = { },
+                            enabled = false
+                        )
+                    } else {
+                        uiState.connectionHistory.forEach { address ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(address, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                },
+                                onClick = { viewModel.selectHistory(address) },
+                                trailingIcon = {
+                                    IconButton(
+                                        onClick = { viewModel.removeHistory(address) },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Close,
+                                            contentDescription = strings.delete,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            )
+                        }
                     }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp)
-            )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -194,7 +242,10 @@ fun HomeScreen(
                     DeviceCard(
                         device = device,
                         isSelected = device == uiState.selectedDevice,
-                        onClick = { viewModel.selectDevice(device) },
+                        onClick = {
+                            viewModel.selectDevice(device)
+                            onDeviceClick(device)
+                        },
                         onDisconnect = { viewModel.disconnectDevice(device) }
                     )
                 }
@@ -217,6 +268,16 @@ fun HomeScreen(
             WirelessPairDialog(
                 onDismiss = { viewModel.togglePairDialog() },
                 onPair = { ip, port, code -> viewModel.pairDevice(ip, port, code) }
+            )
+        }
+
+        // Scan dialog
+        if (uiState.showScanDialog) {
+            ScanDevicesDialog(
+                isScanning = uiState.isScanning,
+                devices = uiState.scannedDevices,
+                onDismiss = { viewModel.dismissScanDialog() },
+                onConnect = { viewModel.connectScannedDevice(it) }
             )
         }
     }
@@ -336,6 +397,88 @@ fun WirelessPairDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(LocalStrings.current.cancel)
+            }
+        }
+    )
+}
+
+@Composable
+fun ScanDevicesDialog(
+    isScanning: Boolean,
+    devices: List<String>,
+    onDismiss: () -> Unit,
+    onConnect: (String) -> Unit
+) {
+    val strings = LocalStrings.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.scanLan) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isScanning) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(strings.scanningLan)
+                    }
+                } else if (devices.isEmpty()) {
+                    Text(
+                        text = strings.noDevicesFound,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        text = strings.scanResult(devices.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    devices.forEach { device ->
+                        Surface(
+                            onClick = { onConnect(device) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.PhoneAndroid,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = device,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Icon(
+                                    Icons.Filled.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.close)
             }
         }
     )

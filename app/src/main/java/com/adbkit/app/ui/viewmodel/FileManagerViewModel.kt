@@ -1,5 +1,6 @@
 package com.adbkit.app.ui.viewmodel
 
+import android.os.Environment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
@@ -15,7 +16,9 @@ data class FileManagerUiState(
     val isLoading: Boolean = false,
     val error: String = "",
     val showCreateDirDialog: Boolean = false,
-    val statusMessage: String = ""
+    val statusMessage: String = "",
+    val isTransferring: Boolean = false,
+    val requestFilePick: Boolean = false
 )
 
 class FileManagerViewModel : ViewModel() {
@@ -80,12 +83,41 @@ class FileManagerViewModel : ViewModel() {
 
     fun pullFile(remotePath: String, fileName: String) {
         viewModelScope.launch {
-            val localPath = "/sdcard/Download/$fileName"
+            _uiState.update { it.copy(isTransferring = true, statusMessage = "Downloading...") }
+            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            downloadDir.mkdirs()
+            val localPath = "${downloadDir.absolutePath}/$fileName"
             val result = AdbService.pullFile(remotePath, localPath)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Downloaded to $localPath" else "Download failed: ${result.error}")
+                it.copy(
+                    isTransferring = false,
+                    statusMessage = if (result.success) "Downloaded to $localPath" else "Download failed: ${result.error}"
+                )
             }
         }
+    }
+
+    fun pushFile(localPath: String, fileName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTransferring = true, statusMessage = "Uploading...") }
+            val remotePath = "${_uiState.value.currentPath}/$fileName"
+            val result = AdbService.pushFile(localPath, remotePath)
+            _uiState.update {
+                it.copy(
+                    isTransferring = false,
+                    statusMessage = if (result.success) "Uploaded $fileName" else "Upload failed: ${result.error}"
+                )
+            }
+            if (result.success) loadFiles()
+        }
+    }
+
+    fun requestUpload() {
+        _uiState.update { it.copy(requestFilePick = true) }
+    }
+
+    fun onFilePickHandled() {
+        _uiState.update { it.copy(requestFilePick = false) }
     }
 
     fun showCreateDirDialog() {

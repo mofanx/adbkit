@@ -20,7 +20,9 @@ data class AppManagerUiState(
     val statusMessage: String = "",
     val showDetailDialog: Boolean = false,
     val selectedPackage: String = "",
-    val appDetails: Map<String, String> = emptyMap()
+    val appDetails: Map<String, String> = emptyMap(),
+    val isInstalling: Boolean = false,
+    val requestApkPick: Boolean = false
 ) {
     val userAppCount: Int get() = userPackages.size
     val systemAppCount: Int get() = systemPackages.size
@@ -152,5 +154,36 @@ class AppManagerViewModel : ViewModel() {
 
     fun clearStatus() {
         _uiState.update { it.copy(statusMessage = "") }
+    }
+
+    fun requestInstallApk() {
+        _uiState.update { it.copy(requestApkPick = true) }
+    }
+
+    fun onApkPickHandled() {
+        _uiState.update { it.copy(requestApkPick = false) }
+    }
+
+    fun installApk(localPath: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isInstalling = true, statusMessage = "Installing...") }
+            // Push APK to device temp, then install
+            val remotePath = "/data/local/tmp/install_temp.apk"
+            val pushResult = AdbService.pushFile(localPath, remotePath)
+            if (!pushResult.success) {
+                _uiState.update { it.copy(isInstalling = false, statusMessage = "Push failed: ${pushResult.error}") }
+                return@launch
+            }
+            val installResult = AdbService.installApp(remotePath)
+            // Clean up temp file
+            AdbService.shell("rm -f $remotePath")
+            _uiState.update {
+                it.copy(
+                    isInstalling = false,
+                    statusMessage = if (installResult.success) "Install successful" else "Install failed: ${installResult.error}"
+                )
+            }
+            if (installResult.success) refresh()
+        }
     }
 }

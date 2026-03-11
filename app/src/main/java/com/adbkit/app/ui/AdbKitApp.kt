@@ -16,8 +16,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.adbkit.app.ui.navigation.Routes
 import com.adbkit.app.ui.navigation.Screen
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.adbkit.app.ui.screens.*
 import com.adbkit.app.ui.strings.*
+import com.adbkit.app.ui.theme.AdbKitTheme
 import com.adbkit.app.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
@@ -27,8 +29,19 @@ fun AdbKitApp(settingsViewModel: SettingsViewModel = viewModel()) {
     val settingsState by settingsViewModel.uiState.collectAsState()
     val strings: AppStrings = if (settingsState.language == "en") EnStrings else ZhStrings
 
-    CompositionLocalProvider(LocalStrings provides strings) {
-        AdbKitContent()
+    val darkTheme = when (settingsState.darkMode) {
+        "dark" -> true
+        "light" -> false
+        else -> isSystemInDarkTheme()
+    }
+
+    AdbKitTheme(
+        darkTheme = darkTheme,
+        dynamicColor = settingsState.dynamicColor
+    ) {
+        CompositionLocalProvider(LocalStrings provides strings) {
+            AdbKitContent()
+        }
     }
 }
 
@@ -42,6 +55,9 @@ private fun AdbKitContent() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Track current device for sidebar display (reactive)
+    val currentDevice by com.adbkit.app.service.AdbService.currentDevice.collectAsState()
+
     val drawerTitles = mapOf(
         Routes.HOME to strings.screenHome,
         Routes.DEVICE_INFO to strings.screenDeviceInfo,
@@ -53,34 +69,99 @@ private fun AdbKitContent() {
         Routes.TERMINAL to strings.screenTerminal,
     )
 
+    fun navigateTo(route: String) {
+        if (currentRoute != route) {
+            navController.navigate(route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(modifier = Modifier.width(300.dp)) {
-                // Header
+                // Header with device info
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(24.dp)
                 ) {
                     Column {
-                        Icon(
-                            imageVector = Icons.Filled.PhoneAndroid,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = strings.appName,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = strings.appSubtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.PhoneAndroid,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = strings.appName,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = strings.appSubtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        // Current device info
+                        if (currentDevice != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Wifi,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = currentDevice ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                currentDevice?.let { com.adbkit.app.service.AdbService.disconnect(it) }
+                                                com.adbkit.app.service.AdbService.setCurrentDevice(null)
+                                            }
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.LinkOff,
+                                            contentDescription = strings.disconnect,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = strings.noDeviceConnected,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 HorizontalDivider()
@@ -100,13 +181,7 @@ private fun AdbKitContent() {
                         selected = currentRoute == screen.route,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            if (currentRoute != screen.route) {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            }
+                            navigateTo(screen.route)
                         },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                     )
@@ -116,25 +191,27 @@ private fun AdbKitContent() {
             }
         }
     ) {
-        NavHost(
-            navController = navController,
-            startDestination = Routes.HOME
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Quick nav bar when device is connected and not on home page
+            if (currentDevice != null && currentRoute != Routes.HOME && currentRoute != Routes.SETTINGS && currentRoute != Routes.FASTBOOT) {
+                QuickNavBar(
+                    currentRoute = currentRoute ?: "",
+                    onNavigate = { navigateTo(it) }
+                )
+            }
+            NavHost(
+                navController = navController,
+                startDestination = Routes.HOME,
+                modifier = Modifier.weight(1f)
+            ) {
             composable(Routes.HOME) {
                 HomeScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
-                    onNavigateToFastboot = {
-                        navController.navigate(Routes.FASTBOOT) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onNavigateToSettings = {
-                        navController.navigate(Routes.SETTINGS) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                        }
+                    onNavigateToFastboot = { navigateTo(Routes.FASTBOOT) },
+                    onNavigateToSettings = { navigateTo(Routes.SETTINGS) },
+                    onDeviceClick = { device ->
+                        // currentDevice is now reactive via StateFlow, no need to set manually
+                        navigateTo(Routes.DEVICE_INFO)
                     }
                 )
             }
@@ -164,6 +241,7 @@ private fun AdbKitContent() {
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(onMenuClick = { scope.launch { drawerState.open() } })
+            }
             }
         }
     }

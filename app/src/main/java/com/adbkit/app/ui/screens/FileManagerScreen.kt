@@ -1,5 +1,9 @@
 package com.adbkit.app.ui.screens
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,12 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FileManagerViewModel
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +33,37 @@ fun FileManagerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+    val context = LocalContext.current
+
+    // File picker for upload
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // Copy URI content to cache file, then push
+            val cursor = context.contentResolver.query(it, null, null, null, null)
+            val fileName = cursor?.use { c ->
+                if (c.moveToFirst()) {
+                    val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) c.getString(idx) else null
+                } else null
+            } ?: "upload_${System.currentTimeMillis()}"
+
+            val cacheFile = File(context.cacheDir, fileName)
+            context.contentResolver.openInputStream(it)?.use { input ->
+                cacheFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            viewModel.pushFile(cacheFile.absolutePath, fileName)
+        }
+    }
+
+    // Trigger file picker when requested
+    LaunchedEffect(uiState.requestFilePick) {
+        if (uiState.requestFilePick) {
+            viewModel.onFilePickHandled()
+            filePickerLauncher.launch("*/*")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -46,6 +83,10 @@ fun FileManagerScreen(
                     }
                     IconButton(onClick = { viewModel.navigateToHome() }) {
                         Icon(Icons.Filled.Home, contentDescription = strings.homeDir)
+                    }
+                    // Upload button - triggers file picker
+                    IconButton(onClick = { viewModel.requestUpload() }) {
+                        Icon(Icons.Filled.Upload, contentDescription = strings.upload)
                     }
                 }
             )
@@ -103,6 +144,32 @@ fun FileManagerScreen(
                         onClick = { viewModel.navigateTo(path) },
                         label = { Text(label, style = MaterialTheme.typography.labelSmall) }
                     )
+                }
+            }
+
+            // Transfer status bar
+            if (uiState.isTransferring || uiState.statusMessage.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = if (uiState.statusMessage.contains("failed", ignoreCase = true))
+                        MaterialTheme.colorScheme.errorContainer
+                    else MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (uiState.isTransferring) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = uiState.statusMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
 

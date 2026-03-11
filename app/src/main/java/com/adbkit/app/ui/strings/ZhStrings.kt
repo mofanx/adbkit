@@ -300,7 +300,7 @@ object ZhStrings : AppStrings {
     // Settings
     override val adbConfig = "ADB 配置"
     override val adbPath = "ADB 路径"
-    override val adbPathHint = "默认 \"adb\"，可指定完整路径如 /data/local/tmp/adb"
+    override val adbPathHint = "默认 \"adb\"，可指定完整路径如 /data/local/tmp/adb（需root权限）"
     override val detect = "检测"
     override val autoDetect = "自动查找"
     override val fastbootPath = "Fastboot 路径"
@@ -314,6 +314,9 @@ object ZhStrings : AppStrings {
     override val confirmDangerousDesc = "卸载、重启、擦除等操作前需要确认"
     override val appearanceSettings = "外观设置"
     override val darkMode = "深色模式"
+    override val darkModeSystem = "跟随系统"
+    override val darkModeLight = "浅色"
+    override val darkModeDark = "深色"
     override val dynamicColor = "动态颜色 (Material You)"
     override val dynamicColorDesc = "Android 12+ 根据壁纸生成主题色"
     override val languageSettings = "语言设置"
@@ -334,4 +337,50 @@ object ZhStrings : AppStrings {
     override val adbUnavailable = { error: String -> "✗ ADB 不可用: $error" }
     override val adbFound = { path: String, info: String -> "✓ 已找到: $path\n$info" }
     override val adbNotFound = "✗ 未找到可用的adb"
+
+    // History & Scan
+    override val noHistory = "暂无历史记录"
+    override val scanningLan = "正在扫描局域网..."
+    override val scanResult = { count: Int -> "发现 $count 个设备" }
+    override val noDevicesFound = "未发现设备"
+    override val scanLan = "扫描局域网"
+
+    // Device click target
+    override val deviceClickTarget = "设备点击跳转"
+    override val deviceClickTargetDesc = "点击设备列表时跳转的目标页面"
+
+    // Sidebar device info
+    override val currentDevice = "当前设备"
+    override val noDeviceConnected = "未连接设备"
+
+    // File management
+    override val upload = "上传"
+    override val uploadFile = "上传文件"
+    override val downloading = "下载中..."
+    override val uploading = "上传中..."
+    override val downloadSuccess = "下载成功"
+    override val uploadSuccess = "上传成功"
+    override val downloadFailed = "下载失败"
+    override val uploadFailed = "上传失败"
+
+    // App management
+    override val installApk = "安装 APK"
+    override val selectApk = "选择 APK 文件"
+    override val installing = "安装中..."
+    override val installSuccess = "安装成功"
+    override val installFailed = "安装失败"
+
+    // Process management
+    override val memoryUsage = "内存占用"
+    override val totalMemory = "总内存"
+    override val usedMemory = "已用内存"
+    override val freeMemory = "可用内存"
+    override val processKilled = "进程已结束"
+
+    // Storage info
+    override val storageInfo = "存储信息"
+    override val internalStorage = "内部存储"
+    override val storageUsed = "已用"
+    override val storageFree = "可用"
+    override val storageTotal = "总计"
 }

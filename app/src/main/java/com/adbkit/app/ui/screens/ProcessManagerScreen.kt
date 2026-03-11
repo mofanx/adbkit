@@ -73,6 +73,56 @@ fun ProcessManagerScreen(
                 )
             }
 
+            // Memory overview card
+            if (uiState.memoryInfo.totalKb > 0) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(strings.memoryUsage, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "${formatMemSize(uiState.memoryInfo.usedKb)} / ${formatMemSize(uiState.memoryInfo.totalKb)}",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { uiState.memoryInfo.usedPercent },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                            color = if (uiState.memoryInfo.usedPercent > 0.85f) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "${strings.usedMemory}: ${formatMemSize(uiState.memoryInfo.usedKb)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "${strings.freeMemory}: ${formatMemSize(uiState.memoryInfo.availableKb)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
             // Process count
             Text(
                 text = strings.totalProcesses(uiState.filteredProcesses.size),
@@ -178,6 +228,10 @@ fun ProcessRow(
 
 private fun formatMemory(kbStr: String): String {
     val kb = kbStr.toLongOrNull() ?: return kbStr
+    return formatMemSize(kb)
+}
+
+private fun formatMemSize(kb: Long): String {
     return when {
         kb < 1024 -> "${kb}K"
         kb < 1024 * 1024 -> "${kb / 1024}M"
