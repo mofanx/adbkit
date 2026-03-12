@@ -97,8 +97,10 @@ private fun ScreenMirrorView(
                             "mjpeg" -> "Screenshot"
                             else -> ""
                         }
+                        val resInfo = if (uiState.videoWidth > 0 && uiState.videoHeight > 0)
+                            " ${uiState.videoWidth}x${uiState.videoHeight}" else ""
                         Text(
-                            "${strings.remoteControl} - ${uiState.fps}fps $modeLabel",
+                            "${strings.remoteControl} - ${uiState.fps}fps $modeLabel$resInfo",
                             style = MaterialTheme.typography.titleSmall
                         )
                     },
@@ -296,8 +298,13 @@ private fun ScreenMirrorView(
 
             // FPS overlay
             if (!showControls) {
+                val overlayMode = when (uiState.streamMode) {
+                    "h264" -> "H.264"
+                    "mjpeg" -> "Screenshot"
+                    else -> ""
+                }
                 Text(
-                    text = strings.fpsOverlay(uiState.fps),
+                    text = "${uiState.fps}fps $overlayMode | ${strings.fpsOverlay(uiState.fps).substringAfter("|").trim()}",
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 10.sp,
                     modifier = Modifier
@@ -468,9 +475,9 @@ private fun SettingsView(
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingRow(
                         label = strings.resolution,
-                        value = uiState.maxSize,
-                        options = listOf("480", "720", "1080", "1440", "1920"),
-                        onValueChange = { viewModel.setMaxSize(it) }
+                        value = "${uiState.maxSize}p",
+                        options = listOf("480p", "720p", "1080p", "1440p", "1920p"),
+                        onValueChange = { viewModel.setMaxSize(it.replace("p", "")) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

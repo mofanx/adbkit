@@ -45,6 +45,7 @@ class ScreenStreamService {
         private const val TAG = "ScreenStream"
         private const val SERVER_DEX = "screen-server.dex"
         private const val DEVICE_SERVER_PATH = "/data/local/tmp/adbkit-server.dex"
+        private const val DEVICE_SERVER_LOG = "/data/local/tmp/adbkit-server.log"
     }
 
     private val _state = MutableStateFlow(StreamState())
@@ -146,9 +147,12 @@ class ScreenStreamService {
             AdbService.shell("pkill -f 'app_process.*ScreenServer'")
         } catch (_: Exception) {}
 
-        // Run server via app_process - wrap in sh -c to ensure CLASSPATH env var works
+        // Run server via app_process
+        // CRITICAL: redirect device stderr to log file, otherwise exec-out merges
+        // stderr into stdout, corrupting the binary H.264 stream
         val serverCmd = "CLASSPATH=$DEVICE_SERVER_PATH app_process / ScreenServer" +
-                " ${config.maxSize} ${config.bitrate} ${config.maxFps}"
+                " ${config.maxSize} ${config.bitrate} ${config.maxFps}" +
+                " 2>$DEVICE_SERVER_LOG"
         val cmd = buildString {
             append(adbPath)
             if (device != null) append(" -s $device")
@@ -196,12 +200,14 @@ class ScreenStreamService {
         } catch (e: Exception) {
             Log.e(TAG, "Timeout reading server header (read $headerRead bytes)", e)
             killServerProcess()
+            readServerLog()
             return false
         }
 
         if (headerRead < 8) {
             Log.e(TAG, "Server header incomplete: got $headerRead bytes, expected 8")
             killServerProcess()
+            readServerLog()
             return false
         }
 
@@ -211,6 +217,7 @@ class ScreenStreamService {
         if (videoWidth <= 0 || videoHeight <= 0 || videoWidth > 4096 || videoHeight > 4096) {
             Log.e(TAG, "Invalid video dimensions: ${videoWidth}x${videoHeight}")
             killServerProcess()
+            readServerLog()
             return false
         }
 
@@ -354,6 +361,20 @@ class ScreenStreamService {
         stderrJob?.cancel()
         stderrJob = null
         cleanupAll()
+    }
+
+    /**
+     * Read server-side log file from device for diagnostics.
+     */
+    private suspend fun readServerLog() {
+        try {
+            val result = AdbService.shell("cat $DEVICE_SERVER_LOG 2>/dev/null")
+            if (result.success && result.output.isNotBlank()) {
+                result.output.lines().forEach { line ->
+                    if (line.isNotBlank()) Log.d(TAG, "ServerLog: $line")
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     private fun killServerProcess() {
