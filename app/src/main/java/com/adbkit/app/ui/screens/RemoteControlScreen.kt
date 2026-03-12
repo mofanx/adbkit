@@ -41,9 +41,14 @@ import com.adbkit.app.ui.viewmodel.RemoteControlViewModel
 @Composable
 fun RemoteControlScreen(
     onMenuClick: () -> Unit,
+    onRemoteConnectedChanged: (Boolean) -> Unit = {},
     viewModel: RemoteControlViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.isConnected) {
+        onRemoteConnectedChanged(uiState.isConnected)
+    }
 
     if (uiState.isConnected) {
         ScreenMirrorView(viewModel = viewModel, onMenuClick = onMenuClick)
@@ -352,8 +357,8 @@ private fun FloatingNavBar(
                     onDrag = { change, dragAmount ->
                         change.consume()
                         dragOffset = Offset(
-                            (dragOffset.x + dragAmount.x).coerceIn(0f, size.width - 56f),
-                            (dragOffset.y + dragAmount.y).coerceIn(0f, size.height - 400f)
+                            (dragOffset.x + dragAmount.x).coerceIn(0f, size.width.toFloat()),
+                            (dragOffset.y + dragAmount.y).coerceIn(0f, size.height.toFloat())
                         )
                     },
                     onDragEnd = {
@@ -361,56 +366,55 @@ private fun FloatingNavBar(
                     }
                 )
             },
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-        tonalElevation = 8.dp,
-        shadowElevation = 8.dp
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(4.dp)
+            modifier = Modifier.padding(2.dp)
         ) {
-            // Toggle button
-            IconButton(onClick = onToggleExpand, modifier = Modifier.size(48.dp)) {
+            // Toggle button (smaller)
+            IconButton(onClick = onToggleExpand, modifier = Modifier.size(36.dp)) {
                 Icon(
                     if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
             if (expanded) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
                 // Navigation buttons
-                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(18.dp))
                 }
-                IconButton(onClick = onHome, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.Home, contentDescription = "Home")
+                IconButton(onClick = onHome, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Home, contentDescription = "Home", modifier = Modifier.size(18.dp))
                 }
-                IconButton(onClick = onRecent, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent")
+                IconButton(onClick = onRecent, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent", modifier = Modifier.size(18.dp))
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 // Volume & Power
-                IconButton(onClick = onVolumeUp, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume Up")
+                IconButton(onClick = onVolumeUp, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Vol+", modifier = Modifier.size(18.dp))
                 }
-                IconButton(onClick = onVolumeDown, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Volume Down")
+                IconButton(onClick = onVolumeDown, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Vol-", modifier = Modifier.size(18.dp))
                 }
-                IconButton(onClick = onPower, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power")
+                IconButton(onClick = onPower, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power", modifier = Modifier.size(18.dp))
                 }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
                 // Exit remote control
-                IconButton(onClick = onExit, modifier = Modifier.size(48.dp)) {
-                    Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error)
+                IconButton(onClick = onExit, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                 }
             }
         }

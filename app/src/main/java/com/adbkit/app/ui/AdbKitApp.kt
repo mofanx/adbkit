@@ -1,8 +1,6 @@
 package com.adbkit.app.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -159,27 +157,28 @@ private fun AdbKitContent() {
             }
         }
     ) {
-        // Click outside drawer to close
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        enabled = drawerState.isOpen
-                    ) {
-                        scope.launch { drawerState.close() }
-                    }
-            ) {
         when (currentView) {
             "home" -> {
                 HomeScreen(
-                    onMenuClick = { /* no drawer on home when disconnected */ },
+                    onMenuClick = {},
                     onNavigateToFastboot = { currentView = "fastboot" },
                     onNavigateToSettings = { currentView = "settings" },
                     onDeviceClick = { device ->
-                        currentView = "connected"
+                        // Verify ADB connection before entering connected view
+                        scope.launch {
+                            val result = com.adbkit.app.service.AdbService.shell("echo ok")
+                            if (result.success) {
+                                currentView = "connected"
+                            } else {
+                                // Try to reconnect
+                                val connectResult = com.adbkit.app.service.AdbService.connect(device)
+                                if (connectResult.success && connectResult.output.contains("connected")) {
+                                    currentView = "connected"
+                                } else {
+                                    com.adbkit.app.service.AdbService.setCurrentDevice(null)
+                                }
+                            }
+                        }
                     }
                 )
             }
@@ -196,8 +195,6 @@ private fun AdbKitContent() {
             }
             "fastboot" -> {
                 FastbootScreen(onMenuClick = { currentView = "home" })
-            }
-        }
             }
         }
     }
@@ -338,7 +335,7 @@ private fun DrawerContent(
 
 /**
  * HorizontalPager for connected device pages.
- * Swipe is disabled on Remote Control page (index 1) to avoid gesture conflicts.
+ * Swipe is disabled only when Remote Control is actively connected (streaming).
  */
 @Composable
 private fun ConnectedPagerHost(
@@ -346,17 +343,21 @@ private fun ConnectedPagerHost(
     drawerState: DrawerState
 ) {
     val scope = rememberCoroutineScope()
+    var isRemoteControlConnected by remember { mutableStateOf(false) }
     val isRemoteControlPage = pagerState.currentPage == 1
 
     HorizontalPager(
         state = pagerState,
-        userScrollEnabled = !isRemoteControlPage,
+        userScrollEnabled = !(isRemoteControlPage && isRemoteControlConnected),
         modifier = Modifier.fillMaxSize()
     ) { page ->
         val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
         when (page) {
             0 -> DeviceInfoScreen(onMenuClick = openDrawer)
-            1 -> RemoteControlScreen(onMenuClick = openDrawer)
+            1 -> RemoteControlScreen(
+                onMenuClick = openDrawer,
+                onRemoteConnectedChanged = { isRemoteControlConnected = it }
+            )
             2 -> FileManagerScreen(onMenuClick = openDrawer)
             3 -> AppManagerScreen(onMenuClick = openDrawer)
             4 -> ProcessManagerScreen(onMenuClick = openDrawer)

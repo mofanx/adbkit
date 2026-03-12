@@ -273,7 +273,7 @@ object ZhStrings : AppStrings {
     override val fullscreen = "全屏"
     override val gettingScreen = "正在获取画面..."
     override val longPressToggleControls = "长按显示控制栏"
-    override val fpsOverlay = { fps: Int -> "$fps fps | 长按显示控制栏" }
+    override val fpsOverlay = { fps: Int -> "$fps fps | 双击退出全屏" }
     override val refreshRate = "刷新率"
     override val refreshRateLow = "低 (2fps)"
     override val refreshRateMid = "中 (5fps)"

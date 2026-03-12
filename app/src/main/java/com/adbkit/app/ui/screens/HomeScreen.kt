@@ -37,11 +37,6 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {},
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = strings.menu)
-                    }
-                },
                 actions = {
                     IconButton(onClick = { viewModel.togglePairDialog() }) {
                         Icon(Icons.Filled.Link, contentDescription = strings.pair)

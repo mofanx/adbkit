@@ -273,7 +273,7 @@ object EnStrings : AppStrings {
     override val fullscreen = "Fullscreen"
     override val gettingScreen = "Getting screen..."
     override val longPressToggleControls = "Long press to toggle controls"
-    override val fpsOverlay = { fps: Int -> "$fps fps | Long press for controls" }
+    override val fpsOverlay = { fps: Int -> "$fps fps | Double tap to exit fullscreen" }
     override val refreshRate = "Refresh Rate"
     override val refreshRateLow = "Low (2fps)"
     override val refreshRateMid = "Medium (5fps)"

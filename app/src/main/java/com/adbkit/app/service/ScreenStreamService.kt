@@ -79,6 +79,9 @@ class ScreenStreamService {
         }
     }
 
+    // NAL unit accumulator for proper H.264 parsing
+    private var nalBuffer = ByteArray(0)
+
     private suspend fun startH264Stream(surface: Surface, config: StreamConfig): Boolean {
         val device = AdbService.getCurrentDevice()
         val adbPath = AdbService.getAdbPath()
@@ -106,11 +109,11 @@ class ScreenStreamService {
 
         val inputStream = streamProcess!!.inputStream
 
-        // Check if we get data within 2 seconds (screenrecord may fail on some devices)
-        val testBuffer = ByteArray(64)
+        // Check if we get data within 3 seconds
+        val testBuffer = ByteArray(4096)
         var bytesRead: Int
         try {
-            withTimeout(2000) {
+            withTimeout(3000) {
                 bytesRead = withContext(Dispatchers.IO) { inputStream.read(testBuffer) }
             }
         } catch (e: Exception) {
@@ -140,21 +143,21 @@ class ScreenStreamService {
         }
 
         _state.value = StreamState(isStreaming = true, streamMode = "h264")
+        nalBuffer = ByteArray(0)
 
         // Feed H.264 NAL units to MediaCodec
         try {
-            // First, feed the initial bytes we already read
-            feedToCodec(testBuffer, 0, bytesRead)
-            // Then continuously read and feed
+            // Process initial bytes
+            processH264Data(testBuffer, bytesRead)
+            // Then continuously read and process
             decodeH264Loop(inputStream)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // Stream ended or error - try restart
+            // Stream ended or error - screenrecord has a 3-minute limit, restart
             if (isRunning.get()) {
-                // screenrecord has a 3-minute limit, restart
                 cleanup()
-                delay(200)
+                delay(300)
                 if (isRunning.get()) {
                     return startH264Stream(surface, config)
                 }
@@ -174,27 +177,81 @@ class ScreenStreamService {
                 }
             }
             if (bytesRead <= 0) break
-            feedToCodec(buffer, 0, bytesRead)
-            drainCodecOutput()
+            processH264Data(buffer, bytesRead)
         }
     }
 
-    private fun feedToCodec(data: ByteArray, offset: Int, length: Int) {
-        val codec = this.codec ?: return
-        var pos = offset
-        while (pos < offset + length) {
-            val inputIndex = codec.dequeueInputBuffer(10_000)
-            if (inputIndex >= 0) {
-                val inputBuffer = codec.getInputBuffer(inputIndex) ?: continue
-                val chunk = minOf(length - (pos - offset), inputBuffer.remaining())
-                inputBuffer.put(data, pos, chunk)
-                codec.queueInputBuffer(inputIndex, 0, chunk, System.nanoTime() / 1000, 0)
-                pos += chunk
+    /**
+     * Parse raw H.264 byte stream into NAL units and feed each to MediaCodec.
+     * NAL units are delimited by start codes: 0x00 0x00 0x00 0x01 or 0x00 0x00 0x01
+     */
+    private fun processH264Data(data: ByteArray, length: Int) {
+        // Append new data to leftover buffer
+        val combined = nalBuffer + data.copyOfRange(0, length)
+        nalBuffer = ByteArray(0)
+
+        var pos = 0
+        val nalUnits = mutableListOf<Pair<Int, Int>>() // start, end pairs
+
+        // Find all NAL unit boundaries
+        while (pos < combined.size - 3) {
+            if (isStartCode4(combined, pos)) {
+                nalUnits.add(Pair(pos, 0))
+                pos += 4
+            } else if (isStartCode3(combined, pos)) {
+                nalUnits.add(Pair(pos, 0))
+                pos += 3
             } else {
-                // Input buffer not available, drain output first
-                drainCodecOutput()
+                pos++
             }
         }
+
+        if (nalUnits.isEmpty()) {
+            // No start code found yet, buffer all data
+            nalBuffer = combined
+            return
+        }
+
+        // Feed complete NAL units (all except the last, which may be incomplete)
+        for (i in 0 until nalUnits.size - 1) {
+            val start = nalUnits[i].first
+            val end = nalUnits[i + 1].first
+            feedNalUnit(combined, start, end - start)
+        }
+
+        // The last NAL unit may be incomplete - check if we have enough data
+        val lastStart = nalUnits.last().first
+        if (nalUnits.size == 1 && combined.size - lastStart < 64) {
+            // Only one NAL unit and it's small - buffer it for more data
+            nalBuffer = combined.copyOfRange(lastStart, combined.size)
+        } else {
+            // Feed last NAL unit and keep no buffer
+            feedNalUnit(combined, lastStart, combined.size - lastStart)
+        }
+    }
+
+    private fun isStartCode4(data: ByteArray, pos: Int): Boolean {
+        return pos + 3 < data.size &&
+                data[pos] == 0.toByte() && data[pos + 1] == 0.toByte() &&
+                data[pos + 2] == 0.toByte() && data[pos + 3] == 1.toByte()
+    }
+
+    private fun isStartCode3(data: ByteArray, pos: Int): Boolean {
+        return pos + 2 < data.size &&
+                data[pos] == 0.toByte() && data[pos + 1] == 0.toByte() && data[pos + 2] == 1.toByte()
+    }
+
+    private fun feedNalUnit(data: ByteArray, offset: Int, length: Int) {
+        val codec = this.codec ?: return
+        val inputIndex = codec.dequeueInputBuffer(50_000) // 50ms timeout
+        if (inputIndex >= 0) {
+            val inputBuffer = codec.getInputBuffer(inputIndex) ?: return
+            inputBuffer.clear()
+            val actual = minOf(length, inputBuffer.remaining())
+            inputBuffer.put(data, offset, actual)
+            codec.queueInputBuffer(inputIndex, 0, actual, System.nanoTime() / 1000, 0)
+        }
+        drainCodecOutput()
     }
 
     private fun drainCodecOutput() {
@@ -203,7 +260,6 @@ class ScreenStreamService {
         while (true) {
             val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 0)
             if (outputIndex >= 0) {
-                // Render to surface (true = render)
                 codec.releaseOutputBuffer(outputIndex, true)
                 updateFps()
             } else {
