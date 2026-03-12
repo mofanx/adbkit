@@ -1,12 +1,12 @@
 package com.adbkit.app.ui.screens
 
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -64,7 +65,7 @@ private fun ScreenMirrorView(
     var dragEnd by remember { mutableStateOf(Offset.Zero) }
     var showControls by remember { mutableStateOf(true) }
     var surfaceReady by remember { mutableStateOf(false) }
-    var currentSurface by remember { mutableStateOf<Surface?>(null) }
+    var currentSurface: Surface? by remember { mutableStateOf(null) }
     var navBarExpanded by remember { mutableStateOf(true) }
     var navBarOffset by remember { mutableStateOf(Offset(16f, 200f)) }
 
