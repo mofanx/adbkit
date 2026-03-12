@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.strings.LocalStrings
@@ -71,8 +72,8 @@ private fun ScreenMirrorView(
     var showControls by remember { mutableStateOf(true) }
     var surfaceReady by remember { mutableStateOf(false) }
     var currentSurface: Surface? by remember { mutableStateOf(null) }
-    var navBarExpanded by remember { mutableStateOf(true) }
-    var navBarOffset by remember { mutableStateOf(Offset(16f, 200f)) }
+    var navBarExpanded by remember { mutableStateOf(false) }
+    var navBarOffset by remember { mutableStateOf<Offset?>(null) }
 
     // Start stream when both connected and surface ready
     LaunchedEffect(uiState.isConnected, surfaceReady, currentSurface) {
@@ -307,23 +308,29 @@ private fun ScreenMirrorView(
                 )
             }
 
-            // Floating draggable navigation bar
-            if (showControls) {
-                FloatingNavBar(
-                    expanded = navBarExpanded,
-                    offset = navBarOffset,
-                    onToggleExpand = { navBarExpanded = !navBarExpanded },
-                    onOffsetChange = { navBarOffset = it },
-                    onBack = { viewModel.sendKey(4) },
-                    onHome = { viewModel.sendKey(3) },
-                    onRecent = { viewModel.sendKey(187) },
-                    onVolumeDown = { viewModel.sendKey(25) },
-                    onVolumeUp = { viewModel.sendKey(24) },
-                    onPower = { viewModel.sendKey(26) },
-                    onExit = { viewModel.startRemoteControl() },
-                    modifier = Modifier.align(Alignment.TopStart)
-                )
+            // Floating draggable navigation bar (always visible, including fullscreen)
+            val density = LocalDensity.current
+            val defaultOffset = remember(viewSize) {
+                if (viewSize.width > 0) {
+                    val navWidthPx = with(density) { 44.dp.toPx() }
+                    Offset((viewSize.width - navWidthPx - 8f).coerceAtLeast(8f), 8f)
+                } else Offset(8f, 8f)
             }
+            FloatingNavBar(
+                expanded = navBarExpanded,
+                offset = navBarOffset ?: defaultOffset,
+                containerSize = viewSize,
+                onToggleExpand = { navBarExpanded = !navBarExpanded },
+                onOffsetChange = { navBarOffset = it },
+                onBack = { viewModel.sendKey(4) },
+                onHome = { viewModel.sendKey(3) },
+                onRecent = { viewModel.sendKey(187) },
+                onVolumeDown = { viewModel.sendKey(25) },
+                onVolumeUp = { viewModel.sendKey(24) },
+                onPower = { viewModel.sendKey(26) },
+                onExit = { viewModel.startRemoteControl() },
+                modifier = Modifier.align(Alignment.TopStart)
+            )
         }
     }
 }
@@ -332,6 +339,7 @@ private fun ScreenMirrorView(
 private fun FloatingNavBar(
     expanded: Boolean,
     offset: Offset,
+    containerSize: IntSize,
     onToggleExpand: () -> Unit,
     onOffsetChange: (Offset) -> Unit,
     onBack: () -> Unit,
@@ -352,13 +360,15 @@ private fun FloatingNavBar(
     Surface(
         modifier = modifier
             .offset { IntOffset(dragOffset.x.toInt(), dragOffset.y.toInt()) }
-            .pointerInput(Unit) {
+            .pointerInput(containerSize) {
                 detectDragGestures(
                     onDrag = { change, dragAmount ->
                         change.consume()
+                        val maxX = (containerSize.width - 44.dp.toPx()).coerceAtLeast(0f)
+                        val maxY = (containerSize.height - 44.dp.toPx()).coerceAtLeast(0f)
                         dragOffset = Offset(
-                            (dragOffset.x + dragAmount.x).coerceIn(0f, size.width.toFloat()),
-                            (dragOffset.y + dragAmount.y).coerceIn(0f, size.height.toFloat())
+                            (dragOffset.x + dragAmount.x).coerceIn(0f, maxX),
+                            (dragOffset.y + dragAmount.y).coerceIn(0f, maxY)
                         )
                     },
                     onDragEnd = {

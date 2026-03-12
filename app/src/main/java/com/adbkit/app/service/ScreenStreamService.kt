@@ -50,19 +50,26 @@ class ScreenStreamService {
     private val _screenshotBitmap = MutableStateFlow<android.graphics.Bitmap?>(null)
     val screenshotBitmap: StateFlow<android.graphics.Bitmap?> = _screenshotBitmap.asStateFlow()
 
+    // Store surface for restart
+    @Volatile
+    private var currentSurface: Surface? = null
+
     /**
      * Start H.264 video stream, decoded by MediaCodec and rendered to the given Surface.
      */
     fun startStream(surface: Surface, config: StreamConfig, scope: CoroutineScope) {
-        if (isRunning.getAndSet(true)) return
+        // Stop existing stream before starting new one
+        stopStream()
 
+        currentSurface = surface
+        isRunning.set(true)
         frameCount = 0
         lastFpsTime = System.currentTimeMillis()
 
         decoderJob = scope.launch(Dispatchers.IO) {
             try {
                 // Try H.264 streaming first
-                if (config.useH264 && startH264Stream(surface, config)) {
+                if (config.useH264 && tryStartH264(surface, config)) {
                     return@launch
                 }
                 // Fallback to screencap JPEG loop
@@ -74,15 +81,37 @@ class ScreenStreamService {
             } finally {
                 cleanup()
                 isRunning.set(false)
+                currentSurface = null
                 _state.value = _state.value.copy(isStreaming = false, streamMode = "none")
             }
         }
     }
 
-    // NAL unit accumulator for proper H.264 parsing
-    private var nalBuffer = ByteArray(0)
+    /**
+     * Try to start H.264 streaming with automatic restart on screenrecord 3-min limit.
+     * Returns true if H.264 was used (even if it eventually fell through to restart).
+     */
+    private suspend fun tryStartH264(surface: Surface, config: StreamConfig): Boolean {
+        var attempts = 0
+        while (isRunning.get() && currentCoroutineContext().isActive && attempts < 100) {
+            attempts++
+            val success = runSingleH264Session(surface, config)
+            if (!success && attempts == 1) {
+                // First attempt failed entirely - H.264 not supported
+                return false
+            }
+            if (!isRunning.get()) break
+            // screenrecord ended (3-min limit) - cleanup and restart
+            cleanupCodecAndProcess()
+            delay(200)
+        }
+        return true
+    }
 
-    private suspend fun startH264Stream(surface: Surface, config: StreamConfig): Boolean {
+    /**
+     * Run a single screenrecord H.264 session. Returns false if H.264 is not available.
+     */
+    private suspend fun runSingleH264Session(surface: Surface, config: StreamConfig): Boolean {
         val device = AdbService.getCurrentDevice()
         val adbPath = AdbService.getAdbPath()
         val sizeArg = "${config.width}x${config.height}"
@@ -109,11 +138,11 @@ class ScreenStreamService {
 
         val inputStream = streamProcess!!.inputStream
 
-        // Check if we get data within 3 seconds
-        val testBuffer = ByteArray(4096)
+        // Check if we get data within 5 seconds
+        val testBuffer = ByteArray(8192)
         var bytesRead: Int
         try {
-            withTimeout(3000) {
+            withTimeout(5000) {
                 bytesRead = withContext(Dispatchers.IO) { inputStream.read(testBuffer) }
             }
         } catch (e: Exception) {
@@ -131,6 +160,7 @@ class ScreenStreamService {
         // Initialize MediaCodec H.264 decoder
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, config.width, config.height)
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, config.width * config.height)
+        format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
 
         try {
             codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -143,26 +173,10 @@ class ScreenStreamService {
         }
 
         _state.value = StreamState(isStreaming = true, streamMode = "h264")
-        nalBuffer = ByteArray(0)
 
-        // Feed H.264 NAL units to MediaCodec
-        try {
-            // Process initial bytes
-            processH264Data(testBuffer, bytesRead)
-            // Then continuously read and process
-            decodeH264Loop(inputStream)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Stream ended or error - screenrecord has a 3-minute limit, restart
-            if (isRunning.get()) {
-                cleanup()
-                delay(300)
-                if (isRunning.get()) {
-                    return startH264Stream(surface, config)
-                }
-            }
-        }
+        // Feed initial data then enter main loop
+        feedRawBytes(testBuffer, bytesRead)
+        decodeH264Loop(inputStream)
         return true
     }
 
@@ -177,88 +191,46 @@ class ScreenStreamService {
                 }
             }
             if (bytesRead <= 0) break
-            processH264Data(buffer, bytesRead)
+            feedRawBytes(buffer, bytesRead)
         }
     }
 
     /**
-     * Parse raw H.264 byte stream into NAL units and feed each to MediaCodec.
-     * NAL units are delimited by start codes: 0x00 0x00 0x00 0x01 or 0x00 0x00 0x01
+     * Feed raw H.264 bytes to MediaCodec. Unlike scrcpy which has a proper framing
+     * protocol, screenrecord outputs a raw Annex B byte stream. We feed chunks directly
+     * to MediaCodec which handles Annex B NAL unit parsing internally.
+     *
+     * This is simpler and more reliable than manual NAL unit splitting because:
+     * - MediaCodec's H.264 decoder accepts raw Annex B streams
+     * - No risk of splitting NAL units incorrectly
+     * - Avoids buffering delays from accumulating incomplete NAL units
      */
-    private fun processH264Data(data: ByteArray, length: Int) {
-        // Append new data to leftover buffer
-        val combined = nalBuffer + data.copyOfRange(0, length)
-        nalBuffer = ByteArray(0)
-
-        var pos = 0
-        val nalUnits = mutableListOf<Pair<Int, Int>>() // start, end pairs
-
-        // Find all NAL unit boundaries
-        while (pos < combined.size - 3) {
-            if (isStartCode4(combined, pos)) {
-                nalUnits.add(Pair(pos, 0))
-                pos += 4
-            } else if (isStartCode3(combined, pos)) {
-                nalUnits.add(Pair(pos, 0))
-                pos += 3
-            } else {
-                pos++
-            }
-        }
-
-        if (nalUnits.isEmpty()) {
-            // No start code found yet, buffer all data
-            nalBuffer = combined
-            return
-        }
-
-        // Feed complete NAL units (all except the last, which may be incomplete)
-        for (i in 0 until nalUnits.size - 1) {
-            val start = nalUnits[i].first
-            val end = nalUnits[i + 1].first
-            feedNalUnit(combined, start, end - start)
-        }
-
-        // The last NAL unit may be incomplete - check if we have enough data
-        val lastStart = nalUnits.last().first
-        if (nalUnits.size == 1 && combined.size - lastStart < 64) {
-            // Only one NAL unit and it's small - buffer it for more data
-            nalBuffer = combined.copyOfRange(lastStart, combined.size)
-        } else {
-            // Feed last NAL unit and keep no buffer
-            feedNalUnit(combined, lastStart, combined.size - lastStart)
-        }
-    }
-
-    private fun isStartCode4(data: ByteArray, pos: Int): Boolean {
-        return pos + 3 < data.size &&
-                data[pos] == 0.toByte() && data[pos + 1] == 0.toByte() &&
-                data[pos + 2] == 0.toByte() && data[pos + 3] == 1.toByte()
-    }
-
-    private fun isStartCode3(data: ByteArray, pos: Int): Boolean {
-        return pos + 2 < data.size &&
-                data[pos] == 0.toByte() && data[pos + 1] == 0.toByte() && data[pos + 2] == 1.toByte()
-    }
-
-    private fun feedNalUnit(data: ByteArray, offset: Int, length: Int) {
+    private fun feedRawBytes(data: ByteArray, length: Int) {
         val codec = this.codec ?: return
-        val inputIndex = codec.dequeueInputBuffer(50_000) // 50ms timeout
-        if (inputIndex >= 0) {
-            val inputBuffer = codec.getInputBuffer(inputIndex) ?: return
-            inputBuffer.clear()
-            val actual = minOf(length, inputBuffer.remaining())
-            inputBuffer.put(data, offset, actual)
-            codec.queueInputBuffer(inputIndex, 0, actual, System.nanoTime() / 1000, 0)
+        var pos = 0
+        while (pos < length && isRunning.get()) {
+            val inputIndex = codec.dequeueInputBuffer(10_000) // 10ms timeout
+            if (inputIndex >= 0) {
+                val inputBuffer = codec.getInputBuffer(inputIndex) ?: break
+                inputBuffer.clear()
+                val chunk = minOf(length - pos, inputBuffer.remaining())
+                inputBuffer.put(data, pos, chunk)
+                codec.queueInputBuffer(inputIndex, 0, chunk, System.nanoTime() / 1000, 0)
+                pos += chunk
+            }
+            drainCodecOutput()
         }
-        drainCodecOutput()
     }
 
     private fun drainCodecOutput() {
         val codec = this.codec ?: return
         val bufferInfo = MediaCodec.BufferInfo()
         while (true) {
-            val outputIndex = codec.dequeueOutputBuffer(bufferInfo, 0)
+            val outputIndex = try {
+                codec.dequeueOutputBuffer(bufferInfo, 1_000) // 1ms timeout
+            } catch (e: Exception) {
+                break
+            }
             if (outputIndex >= 0) {
                 codec.releaseOutputBuffer(outputIndex, true)
                 updateFps()
@@ -330,7 +302,8 @@ class ScreenStreamService {
         cleanup()
     }
 
-    private fun cleanup() {
+    /** Cleanup only codec and process (used between screenrecord restarts). */
+    private fun cleanupCodecAndProcess() {
         try { streamProcess?.destroyForcibly() } catch (_: Exception) {}
         streamProcess = null
         try {
@@ -338,6 +311,11 @@ class ScreenStreamService {
             codec?.release()
         } catch (_: Exception) {}
         codec = null
+    }
+
+    private fun cleanup() {
+        cleanupCodecAndProcess()
+        currentSurface = null
     }
 
     fun isStreaming(): Boolean = isRunning.get()

@@ -93,6 +93,8 @@ private fun AdbKitContent() {
             drawerState.close()
             currentDevice?.let { com.adbkit.app.service.AdbService.disconnect(it) }
             com.adbkit.app.service.AdbService.setCurrentDevice(null)
+            // Reset pager to first page (DeviceInfo) so re-entering doesn't jump to remote control
+            pagerState.scrollToPage(0)
             currentView = "home"
         }
     }
@@ -136,8 +138,8 @@ private fun AdbKitContent() {
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        // Drawer gesture only on home; connected pages use hamburger icon
-        gesturesEnabled = currentView == "home",
+        // Always allow gestures so scrim click can close drawer
+        gesturesEnabled = drawerState.isOpen || currentView == "home",
         drawerContent = {
             if (isConnectedView) {
                 DrawerContent(
@@ -146,11 +148,7 @@ private fun AdbKitContent() {
                     pagerState = pagerState,
                     pagerScreens = pagerScreens,
                     drawerState = drawerState,
-                    onDisconnect = { showDisconnectDialog = true },
-                    onSettings = {
-                        scope.launch { drawerState.close() }
-                        currentView = "settings"
-                    }
+                    onDisconnect = { showDisconnectDialog = true }
                 )
             } else {
                 ModalDrawerSheet(modifier = Modifier.width(240.dp)) {}
@@ -207,8 +205,7 @@ private fun DrawerContent(
     pagerState: PagerState,
     pagerScreens: List<Screen>,
     drawerState: DrawerState,
-    onDisconnect: () -> Unit,
-    onSettings: () -> Unit
+    onDisconnect: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
@@ -319,16 +316,6 @@ private fun DrawerContent(
             )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Settings at bottom
-        NavigationDrawerItem(
-            icon = { Icon(Icons.Filled.Settings, contentDescription = strings.screenSettings) },
-            label = { Text(strings.screenSettings) },
-            selected = false,
-            onClick = onSettings,
-            modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-        )
         Spacer(modifier = Modifier.height(12.dp))
     }
 }
