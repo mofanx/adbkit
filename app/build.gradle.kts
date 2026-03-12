@@ -150,14 +150,18 @@ tasks.register<Copy>("copyScreenServerDex") {
 }
 
 // Register the build output as an additional assets source directory
-// This lets Gradle properly track the dependency automatically.
 android.sourceSets.getByName("main").assets.srcDir(serverAssetsDir)
 
+// Ensure all tasks that read the assets directory depend on our DEX copy task
 afterEvaluate {
-    tasks.matching {
-        it.name.startsWith("merge") && it.name.endsWith("Assets")
-    }.configureEach {
-        dependsOn("copyScreenServerDex")
+    tasks.configureEach {
+        if ((name.startsWith("merge") && name.endsWith("Assets")) ||
+            name.contains("LintVital") ||
+            name.contains("lintVital") ||
+            (name.contains("Lint") && name.contains("Report"))
+        ) {
+            dependsOn("copyScreenServerDex")
+        }
     }
 }
 
