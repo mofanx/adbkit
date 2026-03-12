@@ -9,33 +9,34 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.BufferedInputStream
 import java.io.BufferedReader
+import java.io.DataInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Screen streaming service using a scrcpy-like approach:
+ * Scrcpy-compatible screen streaming service.
  *
- * 1. Push a ScreenServer DEX to the target device
- * 2. Run it via `app_process` — it uses SurfaceControl + MediaCodec encoder
- *    to capture the screen and output low-latency H.264 to stdout
- * 3. Decode the H.264 stream locally with MediaCodec and render to Surface
+ * Protocol:
+ *   1. 8-byte video header: [width(4B BE)][height(4B BE)]
+ *   2. Per packet: 12-byte meta [pts_flags(8B BE)][size(4B BE)] + [data]
+ *      - bit 63 = config (SPS/PPS), bit 62 = keyframe
  *
- * Falls back to screencap JPEG loop if the server fails to start.
+ * No screenshot fallback — H.264 only.
  */
 class ScreenStreamService {
 
     data class StreamConfig(
         val maxSize: Int = 720,
-        val bitrate: Int = 8_000_000,
-        val maxFps: Int = 30
+        val bitrate: Int = 8_000_000
     )
 
     data class StreamState(
         val isStreaming: Boolean = false,
         val fps: Int = 0,
-        val streamMode: String = "none", // "h264", "mjpeg", "none"
+        val streamMode: String = "none", // "h264", "none"
         val error: String = "",
         val videoWidth: Int = 0,
         val videoHeight: Int = 0
@@ -46,6 +47,8 @@ class ScreenStreamService {
         private const val SERVER_DEX = "screen-server.dex"
         private const val DEVICE_SERVER_PATH = "/data/local/tmp/adbkit-server.dex"
         private const val DEVICE_SERVER_LOG = "/data/local/tmp/adbkit-server.log"
+        private const val PACKET_FLAG_CONFIG = 1L shl 63
+        private const val PACKET_FLAG_KEY_FRAME = 1L shl 62
     }
 
     private val _state = MutableStateFlow(StreamState())
@@ -60,10 +63,6 @@ class ScreenStreamService {
     private var lastFpsTime = 0L
     private var serverPushed = false
 
-    // For screencap fallback
-    private val _screenshotBitmap = MutableStateFlow<android.graphics.Bitmap?>(null)
-    val screenshotBitmap: StateFlow<android.graphics.Bitmap?> = _screenshotBitmap.asStateFlow()
-
     fun startStream(surface: Surface, config: StreamConfig, scope: CoroutineScope) {
         stopStream()
 
@@ -73,12 +72,7 @@ class ScreenStreamService {
 
         decoderJob = scope.launch(Dispatchers.IO) {
             try {
-                if (tryStartServerStream(surface, config, scope)) {
-                    return@launch
-                }
-                Log.w(TAG, "Server stream failed, falling back to screencap")
-                // Fallback to screencap
-                startScreencapFallback(config)
+                startServerStream(surface, config, scope)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -92,66 +86,42 @@ class ScreenStreamService {
         }
     }
 
-    /**
-     * Push server DEX to device if not already done.
-     */
     private suspend fun ensureServerPushed() {
         if (serverPushed) return
         val context = AdbKitApplication.instance
         val device = AdbService.getCurrentDevice()
         val adbPath = AdbService.getAdbPath()
 
-        // Extract DEX from assets to local temp file
         val tempFile = java.io.File(context.cacheDir, SERVER_DEX)
-        try {
-            context.assets.open(SERVER_DEX).use { input ->
-                tempFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-        } catch (e: Exception) {
-            throw RuntimeException("Failed to extract server DEX from assets: ${e.message}")
+        context.assets.open(SERVER_DEX).use { input ->
+            tempFile.outputStream().use { output -> input.copyTo(output) }
         }
 
-        // Push to device
         val cmd = buildString {
             append(adbPath)
             if (device != null) append(" -s $device")
             append(" push '${tempFile.absolutePath}' '$DEVICE_SERVER_PATH'")
         }
-        Log.d(TAG, "Pushing server DEX: $cmd")
+        Log.d(TAG, "Push DEX: $cmd")
         val result = AdbService.executeCommand(cmd)
-        if (!result.success) {
-            throw RuntimeException("Failed to push server: ${result.error}")
-        }
-        Log.d(TAG, "Server DEX pushed successfully")
+        if (!result.success) throw RuntimeException("Push failed: ${result.error}")
+        Log.d(TAG, "DEX pushed")
         serverPushed = true
     }
 
-    /**
-     * Start the ScreenServer on the device and decode its H.264 output.
-     */
-    private suspend fun tryStartServerStream(surface: Surface, config: StreamConfig, scope: CoroutineScope): Boolean {
-        try {
-            ensureServerPushed()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to push server DEX", e)
-            return false
-        }
+    private suspend fun startServerStream(surface: Surface, config: StreamConfig, scope: CoroutineScope) {
+        ensureServerPushed()
 
         val device = AdbService.getCurrentDevice()
         val adbPath = AdbService.getAdbPath()
 
-        // Kill any existing server process on device first
-        try {
-            AdbService.shell("pkill -f 'app_process.*ScreenServer'")
-        } catch (_: Exception) {}
+        // Kill any existing server
+        try { AdbService.shell("pkill -f 'app_process.*ScreenServer'") } catch (_: Exception) {}
 
-        // Run server via app_process
         // CRITICAL: redirect device stderr to log file, otherwise exec-out merges
         // stderr into stdout, corrupting the binary H.264 stream
         val serverCmd = "CLASSPATH=$DEVICE_SERVER_PATH app_process / ScreenServer" +
-                " ${config.maxSize} ${config.bitrate} ${config.maxFps}" +
+                " ${config.maxSize} ${config.bitrate}" +
                 " 2>$DEVICE_SERVER_LOG"
         val cmd = buildString {
             append(adbPath)
@@ -159,186 +129,156 @@ class ScreenStreamService {
             append(" exec-out sh -c '$serverCmd'")
         }
 
-        Log.d(TAG, "Starting server: $cmd")
+        Log.d(TAG, "Start server: $cmd")
 
         val pb = ProcessBuilder("sh", "-c", cmd)
         pb.environment()["HOME"] = AdbKitApplication.instance.filesDir.absolutePath
         pb.environment()["TMPDIR"] = AdbKitApplication.instance.cacheDir.absolutePath
+        serverProcess = pb.start()
 
-        try {
-            serverProcess = pb.start()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start server process", e)
-            return false
-        }
-
-        // CRITICAL: Consume stderr in a separate coroutine to prevent process deadlock
-        // If stderr buffer fills up, the process blocks and no stdout data is produced
+        // Consume local adb stderr
         stderrJob = scope.launch(Dispatchers.IO) {
             try {
-                val reader = BufferedReader(InputStreamReader(serverProcess!!.errorStream))
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    Log.d(TAG, "Server: $line")
+                BufferedReader(InputStreamReader(serverProcess!!.errorStream)).use { reader ->
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        Log.d(TAG, "adb: $line")
+                    }
                 }
             } catch (_: Exception) {}
         }
 
-        val inputStream = serverProcess!!.inputStream
+        val dis = DataInputStream(BufferedInputStream(serverProcess!!.inputStream, 65536))
 
-        // Read 8-byte header: [width(4 bytes BE)][height(4 bytes BE)]
+        // Read 8-byte video header
         val header = ByteArray(8)
         var headerRead = 0
         try {
-            withTimeout(15000) { // 15s timeout - server may take time with fallback resolutions
+            withTimeout(15000) {
                 while (headerRead < 8) {
-                    val n = withContext(Dispatchers.IO) { inputStream.read(header, headerRead, 8 - headerRead) }
+                    val n = withContext(Dispatchers.IO) { dis.read(header, headerRead, 8 - headerRead) }
                     if (n <= 0) break
                     headerRead += n
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Timeout reading server header (read $headerRead bytes)", e)
-            killServerProcess()
+            Log.e(TAG, "Header timeout ($headerRead bytes read)", e)
             readServerLog()
-            return false
+            throw RuntimeException("Server header timeout")
         }
 
         if (headerRead < 8) {
-            Log.e(TAG, "Server header incomplete: got $headerRead bytes, expected 8")
-            killServerProcess()
             readServerLog()
-            return false
+            throw RuntimeException("Server header incomplete: $headerRead bytes")
         }
 
-        val videoWidth = readBEInt(header, 0)
-        val videoHeight = readBEInt(header, 4)
+        val videoWidth = readBE32(header, 0)
+        val videoHeight = readBE32(header, 4)
 
         if (videoWidth <= 0 || videoHeight <= 0 || videoWidth > 4096 || videoHeight > 4096) {
-            Log.e(TAG, "Invalid video dimensions: ${videoWidth}x${videoHeight}")
-            killServerProcess()
             readServerLog()
-            return false
+            throw RuntimeException("Invalid dimensions: ${videoWidth}x${videoHeight}")
         }
 
-        Log.d(TAG, "Server started, video: ${videoWidth}x${videoHeight}")
+        Log.d(TAG, "Video: ${videoWidth}x${videoHeight}")
 
-        // Configure MediaCodec decoder
+        // Configure decoder
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, videoWidth, videoHeight)
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, videoWidth * videoHeight)
         try { format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1) } catch (_: Exception) {}
 
-        try {
-            codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-            codec!!.configure(format, surface, null, 0)
-            codec!!.start()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to configure decoder", e)
-            killServerProcess()
-            return false
-        }
+        codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        codec!!.configure(format, surface, null, 0)
+        codec!!.start()
 
-        _state.value = StreamState(isStreaming = true, streamMode = "h264", videoWidth = videoWidth, videoHeight = videoHeight)
+        _state.value = StreamState(
+            isStreaming = true, streamMode = "h264",
+            videoWidth = videoWidth, videoHeight = videoHeight
+        )
 
-        // Main decode loop
-        decodeH264Loop(inputStream)
-        return true
+        // Packet-based decode loop (scrcpy protocol)
+        decodePacketLoop(dis)
     }
 
-    private fun readBEInt(data: ByteArray, offset: Int): Int {
-        return ((data[offset].toInt() and 0xFF) shl 24) or
-                ((data[offset + 1].toInt() and 0xFF) shl 16) or
-                ((data[offset + 2].toInt() and 0xFF) shl 8) or
-                (data[offset + 3].toInt() and 0xFF)
-    }
+    /**
+     * Read framed packets from the server stream.
+     * Each packet: 12-byte meta [pts_flags(8B)][size(4B)] + [data]
+     */
+    private suspend fun decodePacketLoop(dis: DataInputStream) {
+        val metaBuf = ByteArray(12)
 
-    private suspend fun decodeH264Loop(inputStream: InputStream) {
-        val buffer = ByteArray(65536)
         while (isRunning.get() && currentCoroutineContext().isActive) {
-            val bytesRead = withContext(Dispatchers.IO) {
-                try {
-                    inputStream.read(buffer)
-                } catch (e: Exception) {
-                    -1
-                }
+            // Read 12-byte packet meta
+            val metaRead = readFully(dis, metaBuf, 0, 12)
+            if (metaRead < 12) break
+
+            val ptsAndFlags = readBE64(metaBuf, 0)
+            val packetSize = readBE32(metaBuf, 8)
+
+            if (packetSize <= 0 || packetSize > 4 * 1024 * 1024) {
+                Log.w(TAG, "Invalid packet size: $packetSize")
+                break
             }
-            if (bytesRead <= 0) break
-            feedRawBytes(buffer, bytesRead)
+
+            // Read packet data
+            val packetData = ByteArray(packetSize)
+            val dataRead = readFully(dis, packetData, 0, packetSize)
+            if (dataRead < packetSize) break
+
+            val isConfig = (ptsAndFlags and PACKET_FLAG_CONFIG) != 0L
+            val isKeyFrame = (ptsAndFlags and PACKET_FLAG_KEY_FRAME) != 0L
+            val pts = if (isConfig) 0L else (ptsAndFlags and (PACKET_FLAG_CONFIG - 1) and (PACKET_FLAG_KEY_FRAME - 1))
+
+            // Feed to decoder
+            feedPacket(packetData, pts, isConfig, isKeyFrame)
         }
     }
 
-    private fun feedRawBytes(data: ByteArray, length: Int) {
+    private suspend fun readFully(dis: DataInputStream, buf: ByteArray, off: Int, len: Int): Int {
+        var total = 0
+        while (total < len && isRunning.get()) {
+            val n = withContext(Dispatchers.IO) {
+                try { dis.read(buf, off + total, len - total) } catch (_: Exception) { -1 }
+            }
+            if (n <= 0) return total
+            total += n
+        }
+        return total
+    }
+
+    private fun feedPacket(data: ByteArray, pts: Long, isConfig: Boolean, isKeyFrame: Boolean) {
         val codec = this.codec ?: return
-        var pos = 0
-        while (pos < length && isRunning.get()) {
-            val inputIndex = codec.dequeueInputBuffer(10_000)
-            if (inputIndex >= 0) {
-                val inputBuffer = codec.getInputBuffer(inputIndex) ?: break
-                inputBuffer.clear()
-                val chunk = minOf(length - pos, inputBuffer.remaining())
-                inputBuffer.put(data, pos, chunk)
-                codec.queueInputBuffer(inputIndex, 0, chunk, System.nanoTime() / 1000, 0)
-                pos += chunk
+
+        val inputIndex = codec.dequeueInputBuffer(10_000)
+        if (inputIndex >= 0) {
+            val inputBuffer = codec.getInputBuffer(inputIndex) ?: return
+            inputBuffer.clear()
+            inputBuffer.put(data, 0, data.size)
+
+            val flags = when {
+                isConfig -> MediaCodec.BUFFER_FLAG_CODEC_CONFIG
+                isKeyFrame -> MediaCodec.BUFFER_FLAG_KEY_FRAME
+                else -> 0
             }
-            drainCodecOutput()
+            codec.queueInputBuffer(inputIndex, 0, data.size, pts, flags)
         }
+
+        drainDecoderOutput()
     }
 
-    private fun drainCodecOutput() {
+    private fun drainDecoderOutput() {
         val codec = this.codec ?: return
         val bufferInfo = MediaCodec.BufferInfo()
         while (true) {
-            val outputIndex = try {
+            val idx = try {
                 codec.dequeueOutputBuffer(bufferInfo, 1_000)
-            } catch (e: Exception) {
-                break
-            }
-            if (outputIndex >= 0) {
-                codec.releaseOutputBuffer(outputIndex, true)
+            } catch (_: Exception) { break }
+            if (idx >= 0) {
+                codec.releaseOutputBuffer(idx, true)
                 updateFps()
             } else {
                 break
             }
-        }
-    }
-
-    /**
-     * Fallback: screencap PNG loop.
-     */
-    private suspend fun startScreencapFallback(config: StreamConfig) {
-        _state.value = StreamState(isStreaming = true, streamMode = "mjpeg")
-
-        val device = AdbService.getCurrentDevice()
-        val adbPath = AdbService.getAdbPath()
-        val interval = 1000L / config.maxFps.coerceIn(1, 10)
-
-        while (isRunning.get() && currentCoroutineContext().isActive) {
-            try {
-                val cmd = buildString {
-                    append(adbPath)
-                    if (device != null) append(" -s $device")
-                    append(" exec-out screencap -p")
-                }
-                val pb = ProcessBuilder("sh", "-c", cmd)
-                pb.environment()["HOME"] = AdbKitApplication.instance.filesDir.absolutePath
-                pb.environment()["TMPDIR"] = AdbKitApplication.instance.cacheDir.absolutePath
-                val process = pb.start()
-                val bytes = process.inputStream.readBytes()
-                process.waitFor()
-                if (bytes.size > 100) {
-                    val opts = android.graphics.BitmapFactory.Options().apply {
-                        inSampleSize = if (config.maxSize < 720) 2 else 1
-                    }
-                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                    if (bitmap != null) {
-                        _screenshotBitmap.value = bitmap
-                        updateFps()
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {}
-            delay(interval)
         }
     }
 
@@ -347,8 +287,7 @@ class ScreenStreamService {
         val now = System.currentTimeMillis()
         val elapsed = now - lastFpsTime
         if (elapsed >= 1000) {
-            val fps = (frameCount * 1000L / elapsed).toInt()
-            _state.value = _state.value.copy(fps = fps)
+            _state.value = _state.value.copy(fps = (frameCount * 1000L / elapsed).toInt())
             frameCount = 0
             lastFpsTime = now
         }
@@ -363,9 +302,6 @@ class ScreenStreamService {
         cleanupAll()
     }
 
-    /**
-     * Read server-side log file from device for diagnostics.
-     */
     private suspend fun readServerLog() {
         try {
             val result = AdbService.shell("cat $DEVICE_SERVER_LOG 2>/dev/null")
@@ -377,21 +313,30 @@ class ScreenStreamService {
         } catch (_: Exception) {}
     }
 
-    private fun killServerProcess() {
+    private fun cleanupAll() {
         try { serverProcess?.destroyForcibly() } catch (_: Exception) {}
         serverProcess = null
-        stderrJob?.cancel()
-        stderrJob = null
-    }
-
-    private fun cleanupAll() {
-        killServerProcess()
-        try {
-            codec?.stop()
-            codec?.release()
-        } catch (_: Exception) {}
+        try { codec?.stop(); codec?.release() } catch (_: Exception) {}
         codec = null
     }
 
     fun isStreaming(): Boolean = isRunning.get()
+
+    private fun readBE32(buf: ByteArray, off: Int): Int {
+        return ((buf[off].toInt() and 0xFF) shl 24) or
+                ((buf[off + 1].toInt() and 0xFF) shl 16) or
+                ((buf[off + 2].toInt() and 0xFF) shl 8) or
+                (buf[off + 3].toInt() and 0xFF)
+    }
+
+    private fun readBE64(buf: ByteArray, off: Int): Long {
+        return ((buf[off].toLong() and 0xFF) shl 56) or
+                ((buf[off + 1].toLong() and 0xFF) shl 48) or
+                ((buf[off + 2].toLong() and 0xFF) shl 40) or
+                ((buf[off + 3].toLong() and 0xFF) shl 32) or
+                ((buf[off + 4].toLong() and 0xFF) shl 24) or
+                ((buf[off + 5].toLong() and 0xFF) shl 16) or
+                ((buf[off + 6].toLong() and 0xFF) shl 8) or
+                (buf[off + 7].toLong() and 0xFF)
+    }
 }

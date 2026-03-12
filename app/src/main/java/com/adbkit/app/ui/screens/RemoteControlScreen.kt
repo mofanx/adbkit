@@ -3,7 +3,6 @@ package com.adbkit.app.ui.screens
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -24,11 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,11 +88,7 @@ private fun ScreenMirrorView(
             if (showControls) {
                 TopAppBar(
                     title = {
-                        val modeLabel = when (uiState.streamMode) {
-                            "h264" -> "H.264"
-                            "mjpeg" -> "Screenshot"
-                            else -> ""
-                        }
+                        val modeLabel = if (uiState.streamMode == "h264") "H.264" else ""
                         val resInfo = if (uiState.videoWidth > 0 && uiState.videoHeight > 0)
                             " ${uiState.videoWidth}x${uiState.videoHeight}" else ""
                         Text(
@@ -130,8 +122,8 @@ private fun ScreenMirrorView(
                 .onSizeChanged { viewSize = it },
             contentAlignment = Alignment.Center
         ) {
-            // SurfaceView always present - used for H.264 mode, transparent when unused
-            // Keeping it always in composition avoids surfaceDestroyed killing the fallback stream
+            val isViewOnly = uiState.viewOnly
+
             AndroidView(
                 factory = { ctx ->
                     SurfaceView(ctx).apply {
@@ -150,10 +142,10 @@ private fun ScreenMirrorView(
                 },
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
+                    .pointerInput(isViewOnly) {
                         detectTapGestures(
                             onTap = { offset ->
-                                if (viewSize.width > 0 && viewSize.height > 0) {
+                                if (!isViewOnly && viewSize.width > 0 && viewSize.height > 0) {
                                     val xRatio = (offset.x / viewSize.width).coerceIn(0f, 1f)
                                     val yRatio = (offset.y / viewSize.height).coerceIn(0f, 1f)
                                     viewModel.sendTapAt(xRatio, yRatio)
@@ -163,8 +155,7 @@ private fun ScreenMirrorView(
                                 showControls = !showControls
                             },
                             onLongPress = { offset ->
-                                // Forward long press to remote device
-                                if (viewSize.width > 0 && viewSize.height > 0) {
+                                if (!isViewOnly && viewSize.width > 0 && viewSize.height > 0) {
                                     val xRatio = (offset.x / viewSize.width).coerceIn(0f, 1f)
                                     val yRatio = (offset.y / viewSize.height).coerceIn(0f, 1f)
                                     viewModel.sendLongPressAt(xRatio, yRatio)
@@ -172,120 +163,33 @@ private fun ScreenMirrorView(
                             }
                         )
                     }
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                dragStart = offset
-                                dragEnd = offset
-                            },
-                            onDragEnd = {
-                                if (dragStart != Offset.Zero && dragEnd != Offset.Zero && dragStart != dragEnd) {
-                                    if (viewSize.width > 0 && viewSize.height > 0) {
-                                        val x1 = (dragStart.x / viewSize.width).coerceIn(0f, 1f)
-                                        val y1 = (dragStart.y / viewSize.height).coerceIn(0f, 1f)
-                                        val x2 = (dragEnd.x / viewSize.width).coerceIn(0f, 1f)
-                                        val y2 = (dragEnd.y / viewSize.height).coerceIn(0f, 1f)
-                                        viewModel.sendSwipeAt(x1, y1, x2, y2, 300)
+                    .pointerInput(isViewOnly) {
+                        if (!isViewOnly) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    dragStart = offset
+                                    dragEnd = offset
+                                },
+                                onDragEnd = {
+                                    if (dragStart != Offset.Zero && dragEnd != Offset.Zero && dragStart != dragEnd) {
+                                        if (viewSize.width > 0 && viewSize.height > 0) {
+                                            val x1 = (dragStart.x / viewSize.width).coerceIn(0f, 1f)
+                                            val y1 = (dragStart.y / viewSize.height).coerceIn(0f, 1f)
+                                            val x2 = (dragEnd.x / viewSize.width).coerceIn(0f, 1f)
+                                            val y2 = (dragEnd.y / viewSize.height).coerceIn(0f, 1f)
+                                            viewModel.sendSwipeAt(x1, y1, x2, y2, 300)
+                                        }
                                     }
+                                    dragStart = Offset.Zero
+                                    dragEnd = Offset.Zero
+                                },
+                                onDrag = { change, _ ->
+                                    dragEnd = change.position
                                 }
-                                dragStart = Offset.Zero
-                                dragEnd = Offset.Zero
-                            },
-                            onDrag = { change, _ ->
-                                dragEnd = change.position
-                            }
-                        )
+                            )
+                        }
                     }
             )
-
-            // Fallback screencap mode: overlay bitmap on top of SurfaceView
-            if (uiState.streamMode == "mjpeg") {
-                val bitmap = uiState.screenBitmap
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = strings.remoteControl,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onTap = { offset ->
-                                        if (viewSize.width > 0 && viewSize.height > 0) {
-                                            val bw = uiState.bitmapWidth.takeIf { it > 0 } ?: viewSize.width
-                                            val bh = uiState.bitmapHeight.takeIf { it > 0 } ?: viewSize.height
-                                            val scale = minOf(
-                                                viewSize.width.toFloat() / bw,
-                                                viewSize.height.toFloat() / bh
-                                            )
-                                            val imgW = bw * scale
-                                            val imgH = bh * scale
-                                            val offsetX = (viewSize.width - imgW) / 2f
-                                            val offsetY = (viewSize.height - imgH) / 2f
-                                            val xRatio = ((offset.x - offsetX) / imgW).coerceIn(0f, 1f)
-                                            val yRatio = ((offset.y - offsetY) / imgH).coerceIn(0f, 1f)
-                                            viewModel.sendTapAt(xRatio, yRatio)
-                                        }
-                                    },
-                                    onDoubleTap = {
-                                        showControls = !showControls
-                                    },
-                                    onLongPress = { offset ->
-                                        if (viewSize.width > 0 && viewSize.height > 0) {
-                                            val bw = uiState.bitmapWidth.takeIf { it > 0 } ?: viewSize.width
-                                            val bh = uiState.bitmapHeight.takeIf { it > 0 } ?: viewSize.height
-                                            val scale = minOf(
-                                                viewSize.width.toFloat() / bw,
-                                                viewSize.height.toFloat() / bh
-                                            )
-                                            val imgW = bw * scale
-                                            val imgH = bh * scale
-                                            val offsetX = (viewSize.width - imgW) / 2f
-                                            val offsetY = (viewSize.height - imgH) / 2f
-                                            val xRatio = ((offset.x - offsetX) / imgW).coerceIn(0f, 1f)
-                                            val yRatio = ((offset.y - offsetY) / imgH).coerceIn(0f, 1f)
-                                            viewModel.sendLongPressAt(xRatio, yRatio)
-                                        }
-                                    }
-                                )
-                            }
-                            .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragStart = { offset ->
-                                        dragStart = offset
-                                        dragEnd = offset
-                                    },
-                                    onDragEnd = {
-                                        if (dragStart != Offset.Zero && dragEnd != Offset.Zero && dragStart != dragEnd) {
-                                            if (viewSize.width > 0 && viewSize.height > 0) {
-                                                val bw = uiState.bitmapWidth.takeIf { it > 0 } ?: viewSize.width
-                                                val bh = uiState.bitmapHeight.takeIf { it > 0 } ?: viewSize.height
-                                                val scale = minOf(
-                                                    viewSize.width.toFloat() / bw,
-                                                    viewSize.height.toFloat() / bh
-                                                )
-                                                val imgW = bw * scale
-                                                val imgH = bh * scale
-                                                val ox = (viewSize.width - imgW) / 2f
-                                                val oy = (viewSize.height - imgH) / 2f
-                                                val x1 = ((dragStart.x - ox) / imgW).coerceIn(0f, 1f)
-                                                val y1 = ((dragStart.y - oy) / imgH).coerceIn(0f, 1f)
-                                                val x2 = ((dragEnd.x - ox) / imgW).coerceIn(0f, 1f)
-                                                val y2 = ((dragEnd.y - oy) / imgH).coerceIn(0f, 1f)
-                                                viewModel.sendSwipeAt(x1, y1, x2, y2, 300)
-                                            }
-                                        }
-                                        dragStart = Offset.Zero
-                                        dragEnd = Offset.Zero
-                                    },
-                                    onDrag = { change, _ ->
-                                        dragEnd = change.position
-                                    }
-                                )
-                            },
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            }
 
             // Loading indicator when no stream
             if (uiState.streamMode == "none" && uiState.isConnected) {
@@ -298,11 +202,7 @@ private fun ScreenMirrorView(
 
             // FPS overlay
             if (!showControls) {
-                val overlayMode = when (uiState.streamMode) {
-                    "h264" -> "H.264"
-                    "mjpeg" -> "Screenshot"
-                    else -> ""
-                }
+                val overlayMode = if (uiState.streamMode == "h264") "H.264" else ""
                 Text(
                     text = "${uiState.fps}fps $overlayMode | ${strings.fpsOverlay(uiState.fps).substringAfter("|").trim()}",
                     color = Color.White.copy(alpha = 0.6f),
@@ -484,16 +384,8 @@ private fun SettingsView(
                     SettingRow(
                         label = strings.bitrateControl,
                         value = uiState.bitrate,
-                        options = listOf("2Mbps", "4Mbps", "8Mbps", "16Mbps", "32Mbps"),
+                        options = listOf("2Mbps", "4Mbps", "6Mbps", "8Mbps", "12Mbps", "16Mbps", "32Mbps"),
                         onValueChange = { viewModel.setBitrate(it) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    SettingRow(
-                        label = strings.maxFps,
-                        value = "${uiState.maxFps}fps",
-                        options = listOf("10fps", "15fps", "20fps", "30fps", "60fps"),
-                        onValueChange = { viewModel.setMaxFps(it.replace("fps", "")) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -505,9 +397,16 @@ private fun SettingsView(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                     ToggleRow(
-                        label = strings.compatMode,
-                        checked = uiState.compatMode,
-                        onCheckedChange = { viewModel.setCompatMode(it) }
+                        label = strings.audioTransmission,
+                        checked = uiState.audioEnabled,
+                        onCheckedChange = { viewModel.setAudioEnabled(it) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    ToggleRow(
+                        label = strings.viewOnlyMode,
+                        checked = uiState.viewOnly,
+                        onCheckedChange = { viewModel.setViewOnly(it) }
                     )
                 }
             }

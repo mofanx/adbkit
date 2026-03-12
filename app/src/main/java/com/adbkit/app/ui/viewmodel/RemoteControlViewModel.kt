@@ -1,6 +1,5 @@
 package com.adbkit.app.ui.viewmodel
 
-import android.graphics.Bitmap
 import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,9 +14,9 @@ import kotlinx.coroutines.launch
 data class RemoteControlUiState(
     val maxSize: String = "720",
     val bitrate: String = "8Mbps",
-    val maxFps: String = "30",
     val screenOff: Boolean = false,
-    val compatMode: Boolean = false,
+    val audioEnabled: Boolean = false,
+    val viewOnly: Boolean = false,
     val isConnecting: Boolean = false,
     val isConnected: Boolean = false,
     val statusMessage: String = "",
@@ -27,11 +26,7 @@ data class RemoteControlUiState(
     val fps: Int = 0,
     val streamMode: String = "none",
     val videoWidth: Int = 0,
-    val videoHeight: Int = 0,
-    // Fallback bitmap for screencap mode
-    val screenBitmap: Bitmap? = null,
-    val bitmapWidth: Int = 0,
-    val bitmapHeight: Int = 0
+    val videoHeight: Int = 0
 )
 
 class RemoteControlViewModel : ViewModel() {
@@ -42,7 +37,6 @@ class RemoteControlViewModel : ViewModel() {
 
     init {
         loadScreenSize()
-        // Collect stream service state
         viewModelScope.launch {
             streamService.state.collect { streamState ->
                 _uiState.update {
@@ -52,20 +46,6 @@ class RemoteControlViewModel : ViewModel() {
                         videoWidth = streamState.videoWidth,
                         videoHeight = streamState.videoHeight
                     )
-                }
-            }
-        }
-        // Collect fallback bitmap
-        viewModelScope.launch {
-            streamService.screenshotBitmap.collect { bitmap ->
-                if (bitmap != null) {
-                    _uiState.update {
-                        it.copy(
-                            screenBitmap = bitmap,
-                            bitmapWidth = bitmap.width,
-                            bitmapHeight = bitmap.height
-                        )
-                    }
                 }
             }
         }
@@ -91,34 +71,29 @@ class RemoteControlViewModel : ViewModel() {
 
     fun setMaxSize(value: String) { _uiState.update { it.copy(maxSize = value) } }
     fun setBitrate(value: String) { _uiState.update { it.copy(bitrate = value) } }
-    fun setMaxFps(value: String) { _uiState.update { it.copy(maxFps = value) } }
     fun setScreenOff(value: Boolean) { _uiState.update { it.copy(screenOff = value) } }
-    fun setCompatMode(value: Boolean) { _uiState.update { it.copy(compatMode = value) } }
+    fun setAudioEnabled(value: Boolean) { _uiState.update { it.copy(audioEnabled = value) } }
+    fun setViewOnly(value: Boolean) { _uiState.update { it.copy(viewOnly = value) } }
 
-    private fun parseMaxSize(): Int {
-        return _uiState.value.maxSize.toIntOrNull() ?: 720
-    }
+    private fun parseMaxSize(): Int = _uiState.value.maxSize.toIntOrNull() ?: 720
 
     private fun parseBitrate(): Int {
         return when (_uiState.value.bitrate) {
             "2Mbps" -> 2_000_000
             "4Mbps" -> 4_000_000
+            "6Mbps" -> 6_000_000
             "8Mbps" -> 8_000_000
+            "12Mbps" -> 12_000_000
             "16Mbps" -> 16_000_000
             "32Mbps" -> 32_000_000
             else -> 8_000_000
         }
     }
 
-    /**
-     * Start H.264 stream to a Surface (SurfaceView/TextureView).
-     * Called from the UI when the Surface is available.
-     */
     fun startH264Stream(surface: Surface) {
         val config = ScreenStreamService.StreamConfig(
             maxSize = parseMaxSize(),
-            bitrate = parseBitrate(),
-            maxFps = _uiState.value.maxFps.toIntOrNull() ?: 30
+            bitrate = parseBitrate()
         )
         streamService.startStream(surface, config, viewModelScope)
     }
@@ -126,7 +101,7 @@ class RemoteControlViewModel : ViewModel() {
     fun startRemoteControl() {
         if (_uiState.value.isConnected) {
             stopStream()
-            _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected", screenBitmap = null) }
+            _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected") }
             return
         }
         if (AdbService.getCurrentDevice() == null) {
@@ -187,14 +162,7 @@ class RemoteControlViewModel : ViewModel() {
     fun sendTapAt(xRatio: Float, yRatio: Float) {
         val (x, y) = ratioToDeviceCoords(xRatio, yRatio)
         viewModelScope.launch {
-            if (_uiState.value.compatMode) {
-                val result = AdbService.inputTap(x, y)
-                if (!result.success) {
-                    AdbService.shell("input touchscreen tap $x $y")
-                }
-            } else {
-                AdbService.inputTap(x, y)
-            }
+            AdbService.inputTap(x, y)
         }
     }
 
@@ -210,14 +178,7 @@ class RemoteControlViewModel : ViewModel() {
         val (x1, y1) = ratioToDeviceCoords(x1Ratio, y1Ratio)
         val (x2, y2) = ratioToDeviceCoords(x2Ratio, y2Ratio)
         viewModelScope.launch {
-            if (_uiState.value.compatMode) {
-                val result = AdbService.inputSwipe(x1, y1, x2, y2, duration)
-                if (!result.success) {
-                    AdbService.shell("input touchscreen swipe $x1 $y1 $x2 $y2 $duration")
-                }
-            } else {
-                AdbService.inputSwipe(x1, y1, x2, y2, duration)
-            }
+            AdbService.inputSwipe(x1, y1, x2, y2, duration)
         }
     }
 

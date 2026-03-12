@@ -303,7 +303,8 @@ interface AppStrings {
     val hidden: String
     val fullscreenDisplay: String
     val screenOffControl: String
-    val compatMode: String
+    val audioTransmission: String
+    val viewOnlyMode: String
     val usageGuide: String
     val usageTip1: String
     val usageTip2: String
