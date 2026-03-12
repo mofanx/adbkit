@@ -78,7 +78,7 @@ android {
 // using android.jar from the SDK and d8 from build-tools.
 val serverSrcDir = rootProject.layout.projectDirectory.dir("server/src")
 val serverBuildDir = layout.buildDirectory.dir("server")
-val assetsDir = layout.projectDirectory.dir("src/main/assets")
+val serverAssetsDir = layout.buildDirectory.dir("server/assets")
 
 tasks.register("compileScreenServer") {
     val srcFile = serverSrcDir.file("ScreenServer.java")
@@ -146,12 +146,19 @@ tasks.register<Copy>("copyScreenServerDex") {
         include("classes.dex")
         rename("classes.dex", "screen-server.dex")
     }
-    into(assetsDir)
+    into(serverAssetsDir)
 }
 
-// Hook into the build: ensure DEX is ready before app resources are merged
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
-    dependsOn("copyScreenServerDex")
+// Register the build output as an additional assets source directory
+// This lets Gradle properly track the dependency automatically.
+android.sourceSets.getByName("main").assets.srcDir(serverAssetsDir)
+
+afterEvaluate {
+    tasks.matching {
+        it.name.startsWith("merge") && it.name.endsWith("Assets")
+    }.configureEach {
+        dependsOn("copyScreenServerDex")
+    }
 }
 
 dependencies {
