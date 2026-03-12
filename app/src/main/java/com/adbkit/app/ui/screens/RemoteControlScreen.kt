@@ -70,6 +70,7 @@ private fun ScreenMirrorView(
     var currentSurface: Surface? by remember { mutableStateOf(null) }
     var navBarExpanded by remember { mutableStateOf(false) }
     var navBarOffset by remember { mutableStateOf<Offset?>(null) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     // Start stream when both connected and surface ready
     LaunchedEffect(uiState.isConnected, surfaceReady, currentSurface) {
@@ -112,7 +113,23 @@ private fun ScreenMirrorView(
                 )
             }
         },
-        bottomBar = {}
+        bottomBar = {
+            // Bottom nav bar mode
+            if (uiState.navBarStyle == "bottom") {
+                BottomNavBar(
+                    onBack = { viewModel.sendKey(4) },
+                    onHome = { viewModel.sendKey(3) },
+                    onRecent = { viewModel.sendKey(187) },
+                    showMoreMenu = showMoreMenu,
+                    onToggleMore = { showMoreMenu = !showMoreMenu },
+                    onDismissMore = { showMoreMenu = false },
+                    onVolumeUp = { viewModel.sendKey(24) },
+                    onVolumeDown = { viewModel.sendKey(25) },
+                    onPower = { viewModel.sendKey(26) },
+                    onExit = { viewModel.startRemoteControl() }
+                )
+            }
+        }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -123,6 +140,28 @@ private fun ScreenMirrorView(
             contentAlignment = Alignment.Center
         ) {
             val isViewOnly = uiState.viewOnly
+            val keepAR = uiState.keepAspectRatio
+            val vw = uiState.videoWidth
+            val vh = uiState.videoHeight
+
+            // Calculate aspect-ratio constrained modifier
+            val surfaceModifier = if (keepAR && vw > 0 && vh > 0 && viewSize.width > 0 && viewSize.height > 0) {
+                val containerW = viewSize.width.toFloat()
+                val containerH = viewSize.height.toFloat()
+                val videoAR = vw.toFloat() / vh.toFloat()
+                val containerAR = containerW / containerH
+                val (w, h) = if (videoAR > containerAR) {
+                    containerW to (containerW / videoAR)
+                } else {
+                    (containerH * videoAR) to containerH
+                }
+                Modifier.size(
+                    width = with(LocalDensity.current) { w.toDp() },
+                    height = with(LocalDensity.current) { h.toDp() }
+                )
+            } else {
+                Modifier.fillMaxSize()
+            }
 
             AndroidView(
                 factory = { ctx ->
@@ -140,24 +179,20 @@ private fun ScreenMirrorView(
                         })
                     }
                 },
-                modifier = Modifier
-                    .fillMaxSize()
+                modifier = surfaceModifier
                     .pointerInput(isViewOnly) {
                         detectTapGestures(
                             onTap = { offset ->
-                                if (!isViewOnly && viewSize.width > 0 && viewSize.height > 0) {
-                                    val xRatio = (offset.x / viewSize.width).coerceIn(0f, 1f)
-                                    val yRatio = (offset.y / viewSize.height).coerceIn(0f, 1f)
+                                if (!isViewOnly && size.width > 0 && size.height > 0) {
+                                    val xRatio = (offset.x / size.width).coerceIn(0f, 1f)
+                                    val yRatio = (offset.y / size.height).coerceIn(0f, 1f)
                                     viewModel.sendTapAt(xRatio, yRatio)
                                 }
                             },
-                            onDoubleTap = {
-                                showControls = !showControls
-                            },
                             onLongPress = { offset ->
-                                if (!isViewOnly && viewSize.width > 0 && viewSize.height > 0) {
-                                    val xRatio = (offset.x / viewSize.width).coerceIn(0f, 1f)
-                                    val yRatio = (offset.y / viewSize.height).coerceIn(0f, 1f)
+                                if (!isViewOnly && size.width > 0 && size.height > 0) {
+                                    val xRatio = (offset.x / size.width).coerceIn(0f, 1f)
+                                    val yRatio = (offset.y / size.height).coerceIn(0f, 1f)
                                     viewModel.sendLongPressAt(xRatio, yRatio)
                                 }
                             }
@@ -172,11 +207,11 @@ private fun ScreenMirrorView(
                                 },
                                 onDragEnd = {
                                     if (dragStart != Offset.Zero && dragEnd != Offset.Zero && dragStart != dragEnd) {
-                                        if (viewSize.width > 0 && viewSize.height > 0) {
-                                            val x1 = (dragStart.x / viewSize.width).coerceIn(0f, 1f)
-                                            val y1 = (dragStart.y / viewSize.height).coerceIn(0f, 1f)
-                                            val x2 = (dragEnd.x / viewSize.width).coerceIn(0f, 1f)
-                                            val y2 = (dragEnd.y / viewSize.height).coerceIn(0f, 1f)
+                                        if (size.width > 0 && size.height > 0) {
+                                            val x1 = (dragStart.x / size.width).coerceIn(0f, 1f)
+                                            val y1 = (dragStart.y / size.height).coerceIn(0f, 1f)
+                                            val x2 = (dragEnd.x / size.width).coerceIn(0f, 1f)
+                                            val y2 = (dragEnd.y / size.height).coerceIn(0f, 1f)
                                             viewModel.sendSwipeAt(x1, y1, x2, y2, 300)
                                         }
                                     }
@@ -200,11 +235,10 @@ private fun ScreenMirrorView(
                 }
             }
 
-            // FPS overlay
-            if (!showControls) {
-                val overlayMode = if (uiState.streamMode == "h264") "H.264" else ""
+            // FPS overlay (always shown in top-end)
+            if (uiState.streamMode == "h264") {
                 Text(
-                    text = "${uiState.fps}fps $overlayMode | ${strings.fpsOverlay(uiState.fps).substringAfter("|").trim()}",
+                    text = "${uiState.fps}fps H.264",
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 10.sp,
                     modifier = Modifier
@@ -215,32 +249,105 @@ private fun ScreenMirrorView(
                 )
             }
 
-            // Floating draggable navigation bar (always visible, including fullscreen)
-            val density = LocalDensity.current
-            val defaultOffset = remember(viewSize) {
-                if (viewSize.width > 0) {
-                    val navWidthPx = with(density) { 52.dp.toPx() }
-                    Offset((viewSize.width - navWidthPx - 8f).coerceAtLeast(8f), 8f)
-                } else Offset(8f, 8f)
+            // Floating nav bar (only in "floating" mode)
+            if (uiState.navBarStyle == "floating") {
+                val density = LocalDensity.current
+                val defaultOffset = remember(viewSize) {
+                    if (viewSize.width > 0) {
+                        val navWidthPx = with(density) { 52.dp.toPx() }
+                        Offset((viewSize.width - navWidthPx - 8f).coerceAtLeast(8f), 8f)
+                    } else Offset(8f, 8f)
+                }
+                FloatingNavBar(
+                    expanded = navBarExpanded,
+                    offset = navBarOffset ?: defaultOffset,
+                    containerSize = viewSize,
+                    onToggleExpand = { navBarExpanded = !navBarExpanded },
+                    onOffsetChange = { navBarOffset = it },
+                    onBack = { viewModel.sendKey(4) },
+                    onHome = { viewModel.sendKey(3) },
+                    onRecent = { viewModel.sendKey(187) },
+                    onVolumeDown = { viewModel.sendKey(25) },
+                    onVolumeUp = { viewModel.sendKey(24) },
+                    onPower = { viewModel.sendKey(26) },
+                    onExit = { viewModel.startRemoteControl() },
+                    modifier = Modifier.align(Alignment.TopStart)
+                )
             }
-            FloatingNavBar(
-                expanded = navBarExpanded,
-                offset = navBarOffset ?: defaultOffset,
-                containerSize = viewSize,
-                onToggleExpand = { navBarExpanded = !navBarExpanded },
-                onOffsetChange = { navBarOffset = it },
-                onBack = { viewModel.sendKey(4) },
-                onHome = { viewModel.sendKey(3) },
-                onRecent = { viewModel.sendKey(187) },
-                onVolumeDown = { viewModel.sendKey(25) },
-                onVolumeUp = { viewModel.sendKey(24) },
-                onPower = { viewModel.sendKey(26) },
-                onExit = { viewModel.startRemoteControl() },
-                modifier = Modifier.align(Alignment.TopStart)
-            )
+            // "hidden" mode: no nav bar at all
         }
     }
 }
+
+// ─── Bottom Navigation Bar ──────────────────────────────────────────────────────
+
+@Composable
+private fun BottomNavBar(
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onRecent: () -> Unit,
+    showMoreMenu: Boolean,
+    onToggleMore: () -> Unit,
+    onDismissMore: () -> Unit,
+    onVolumeUp: () -> Unit,
+    onVolumeDown: () -> Unit,
+    onPower: () -> Unit,
+    onExit: () -> Unit
+) {
+    val strings = LocalStrings.current
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+        tonalElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.btnBack)
+            }
+            IconButton(onClick = onHome) {
+                Icon(Icons.Filled.Home, contentDescription = strings.btnHome)
+            }
+            IconButton(onClick = onRecent) {
+                Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = strings.btnRecent)
+            }
+            Box {
+                IconButton(onClick = onToggleMore) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = strings.btnMore)
+                }
+                DropdownMenu(expanded = showMoreMenu, onDismissRequest = onDismissMore) {
+                    DropdownMenuItem(
+                        text = { Text("Vol+") },
+                        onClick = { onVolumeUp(); onDismissMore() },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Vol-") },
+                        onClick = { onVolumeDown(); onDismissMore() },
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeDown, null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Power") },
+                        onClick = { onPower(); onDismissMore() },
+                        leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, null) }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text(strings.disconnect, color = MaterialTheme.colorScheme.error) },
+                        onClick = { onExit(); onDismissMore() },
+                        leadingIcon = { Icon(Icons.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Floating Draggable Navigation Bar ──────────────────────────────────────────
 
 @Composable
 private fun FloatingNavBar(
@@ -292,7 +399,6 @@ private fun FloatingNavBar(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(4.dp)
         ) {
-            // Toggle button
             IconButton(onClick = onToggleExpand, modifier = Modifier.size(44.dp)) {
                 Icon(
                     if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
@@ -303,7 +409,6 @@ private fun FloatingNavBar(
             }
 
             if (expanded) {
-                // Navigation buttons
                 IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(22.dp))
                 }
@@ -313,10 +418,7 @@ private fun FloatingNavBar(
                 IconButton(onClick = onRecent, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent", modifier = Modifier.size(22.dp))
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
-                // Volume & Power
                 IconButton(onClick = onVolumeUp, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Vol+", modifier = Modifier.size(22.dp))
                 }
@@ -326,10 +428,7 @@ private fun FloatingNavBar(
                 IconButton(onClick = onPower, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power", modifier = Modifier.size(22.dp))
                 }
-
                 Spacer(modifier = Modifier.height(4.dp))
-
-                // Exit remote control
                 IconButton(onClick = onExit, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
                 }
@@ -337,6 +436,8 @@ private fun FloatingNavBar(
         }
     }
 }
+
+// ─── Settings View ──────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -367,7 +468,6 @@ private fun SettingsView(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Settings card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
@@ -386,6 +486,34 @@ private fun SettingsView(
                         value = uiState.bitrate,
                         options = listOf("2Mbps", "4Mbps", "6Mbps", "8Mbps", "12Mbps", "16Mbps", "32Mbps"),
                         onValueChange = { viewModel.setBitrate(it) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    ToggleRow(
+                        label = strings.keepAspectRatio,
+                        checked = uiState.keepAspectRatio,
+                        onCheckedChange = { viewModel.setKeepAspectRatio(it) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    SettingRow(
+                        label = strings.navBarStyle,
+                        value = when (uiState.navBarStyle) {
+                            "floating" -> strings.floating
+                            "bottom" -> strings.bottom
+                            "hidden" -> strings.hidden
+                            else -> strings.floating
+                        },
+                        options = listOf(strings.floating, strings.bottom, strings.hidden),
+                        onValueChange = {
+                            val style = when (it) {
+                                strings.floating -> "floating"
+                                strings.bottom -> "bottom"
+                                strings.hidden -> "hidden"
+                                else -> "floating"
+                            }
+                            viewModel.setNavBarStyle(style)
+                        }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -411,7 +539,6 @@ private fun SettingsView(
                 }
             }
 
-            // Connect button
             Button(
                 onClick = { viewModel.startRemoteControl() },
                 modifier = Modifier
@@ -431,7 +558,6 @@ private fun SettingsView(
                 Text(strings.connect, style = MaterialTheme.typography.bodyLarge)
             }
 
-            // Status
             if (uiState.statusMessage.isNotEmpty()) {
                 Text(
                     text = uiState.statusMessage,
@@ -443,6 +569,8 @@ private fun SettingsView(
         }
     }
 }
+
+// ─── Reusable Setting Components ────────────────────────────────────────────────
 
 @Composable
 fun SettingRow(
@@ -494,6 +622,6 @@ fun ToggleRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium)
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

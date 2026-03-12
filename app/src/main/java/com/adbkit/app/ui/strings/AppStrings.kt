@@ -286,34 +286,20 @@ interface AppStrings {
     val remoteControl: String
     val fullscreen: String
     val gettingScreen: String
-    val longPressToggleControls: String
     val fpsOverlay: (Int) -> String
-    val refreshRate: String
-    val refreshRateLow: String
-    val refreshRateMid: String
-    val refreshRateHigh: String
-    val refreshRateUltra: String
-    val maxFps: String
-    val aspectRatio: String
-    val keepOriginal: String
-    val adaptive: String
-    val navBarPosition: String
+    val keepAspectRatio: String
+    val navBarStyle: String
     val floating: String
     val bottom: String
     val hidden: String
-    val fullscreenDisplay: String
     val screenOffControl: String
     val audioTransmission: String
     val viewOnlyMode: String
-    val usageGuide: String
-    val usageTip1: String
-    val usageTip2: String
-    val usageTip3: String
-    val usageTip4: String
-    val usageTip5: String
+    val pressBackAgainToExit: String
     val btnBack: String
     val btnHome: String
     val btnRecent: String
+    val btnMore: String
 
     // Settings screen
     val adbConfig: String

@@ -1,5 +1,6 @@
 package com.adbkit.app.ui
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,11 +71,13 @@ private fun AdbKitContent() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    val context = LocalContext.current
     val currentDevice by com.adbkit.app.service.AdbService.currentDevice.collectAsState()
 
     // Simple navigation state
-    var currentView by remember { mutableStateOf("home") }  // "home", "connected", "settings", "fastboot"
-    var showDisconnectDialog by remember { mutableStateOf(false) }
+    var currentView by remember { mutableStateOf("home") }
+    // Track the device that was used when entering connected view, to detect switch
+    var connectedDeviceKey by remember { mutableStateOf<String?>(null) }
 
     // Pager state for connected pages
     val pagerState = rememberPagerState(
@@ -93,44 +97,33 @@ private fun AdbKitContent() {
             drawerState.close()
             currentDevice?.let { com.adbkit.app.service.AdbService.disconnect(it) }
             com.adbkit.app.service.AdbService.setCurrentDevice(null)
-            // Reset pager to first page (DeviceInfo) so re-entering doesn't jump to remote control
             pagerState.scrollToPage(0)
             currentView = "home"
         }
     }
 
-    // Back handler
+    // Double-press back to disconnect (with toast on first press)
+    var lastBackPressTime by remember { mutableStateOf(0L) }
+    // Track fullscreen state for remote control page
+    var isRemoteFullscreen by remember { mutableStateOf(false) }
+
     BackHandler(enabled = currentView != "home") {
         if (currentView == "connected" && currentDevice != null) {
-            showDisconnectDialog = true
+            // If in fullscreen remote control, exit fullscreen first
+            if (isRemoteFullscreen) {
+                isRemoteFullscreen = false
+                return@BackHandler
+            }
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressTime < 2000) {
+                performDisconnect()
+            } else {
+                lastBackPressTime = now
+                Toast.makeText(context, strings.pressBackAgainToExit, Toast.LENGTH_SHORT).show()
+            }
         } else {
             currentView = "home"
         }
-    }
-
-    // Disconnect confirmation dialog
-    if (showDisconnectDialog) {
-        AlertDialog(
-            onDismissRequest = { showDisconnectDialog = false },
-            icon = { Icon(Icons.Filled.LinkOff, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text(strings.disconnectConfirmTitle) },
-            text = { Text(strings.disconnectConfirmMessage) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDisconnectDialog = false
-                        performDisconnect()
-                    }
-                ) {
-                    Text(strings.confirm, color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDisconnectDialog = false }) {
-                    Text(strings.cancel)
-                }
-            }
-        )
     }
 
     // Only show drawer when connected
@@ -148,7 +141,7 @@ private fun AdbKitContent() {
                     pagerState = pagerState,
                     pagerScreens = pagerScreens,
                     drawerState = drawerState,
-                    onDisconnect = { showDisconnectDialog = true }
+                    onDisconnect = { performDisconnect() }
                 )
             } else {
                 ModalDrawerSheet(modifier = Modifier.width(240.dp)) {}
@@ -162,13 +155,17 @@ private fun AdbKitContent() {
                     onNavigateToFastboot = { currentView = "fastboot" },
                     onNavigateToSettings = { currentView = "settings" },
                     onDeviceClick = { device ->
-                        // Verify ADB connection before entering connected view
                         scope.launch {
+                            // Reset pager when switching to a different device
+                            if (connectedDeviceKey != null && connectedDeviceKey != device) {
+                                pagerState.scrollToPage(0)
+                            }
+                            connectedDeviceKey = device
+
                             val result = com.adbkit.app.service.AdbService.shell("echo ok")
                             if (result.success) {
                                 currentView = "connected"
                             } else {
-                                // Try to reconnect
                                 val connectResult = com.adbkit.app.service.AdbService.connect(device)
                                 if (connectResult.success && connectResult.output.contains("connected")) {
                                     currentView = "connected"
@@ -183,7 +180,10 @@ private fun AdbKitContent() {
             "connected" -> {
                 ConnectedPagerHost(
                     pagerState = pagerState,
-                    drawerState = drawerState
+                    drawerState = drawerState,
+                    deviceKey = connectedDeviceKey,
+                    isFullscreen = isRemoteFullscreen,
+                    onFullscreenChanged = { isRemoteFullscreen = it }
                 )
             }
             "settings" -> {
@@ -323,33 +323,40 @@ private fun DrawerContent(
 /**
  * HorizontalPager for connected device pages.
  * Swipe is disabled only when Remote Control is actively connected (streaming).
+ * Uses key(deviceKey) to force recomposition when switching devices, clearing old data.
  */
 @Composable
 private fun ConnectedPagerHost(
     pagerState: PagerState,
-    drawerState: DrawerState
+    drawerState: DrawerState,
+    deviceKey: String?,
+    isFullscreen: Boolean,
+    onFullscreenChanged: (Boolean) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var isRemoteControlConnected by remember { mutableStateOf(false) }
     val isRemoteControlPage = pagerState.currentPage == 1
 
-    HorizontalPager(
-        state = pagerState,
-        userScrollEnabled = !(isRemoteControlPage && isRemoteControlConnected),
-        modifier = Modifier.fillMaxSize()
-    ) { page ->
-        val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
-        when (page) {
-            0 -> DeviceInfoScreen(onMenuClick = openDrawer)
-            1 -> RemoteControlScreen(
-                onMenuClick = openDrawer,
-                onRemoteConnectedChanged = { isRemoteControlConnected = it }
-            )
-            2 -> FileManagerScreen(onMenuClick = openDrawer)
-            3 -> AppManagerScreen(onMenuClick = openDrawer)
-            4 -> ProcessManagerScreen(onMenuClick = openDrawer)
-            5 -> TerminalScreen(onMenuClick = openDrawer)
-            6 -> ToolsScreen(onMenuClick = openDrawer)
+    // key(deviceKey) forces full recomposition of all child screens when switching devices
+    key(deviceKey) {
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = !(isRemoteControlPage && isRemoteControlConnected),
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
+            when (page) {
+                0 -> DeviceInfoScreen(onMenuClick = openDrawer)
+                1 -> RemoteControlScreen(
+                    onMenuClick = openDrawer,
+                    onRemoteConnectedChanged = { isRemoteControlConnected = it }
+                )
+                2 -> FileManagerScreen(onMenuClick = openDrawer)
+                3 -> AppManagerScreen(onMenuClick = openDrawer)
+                4 -> ProcessManagerScreen(onMenuClick = openDrawer)
+                5 -> TerminalScreen(onMenuClick = openDrawer)
+                6 -> ToolsScreen(onMenuClick = openDrawer)
+            }
         }
     }
 }

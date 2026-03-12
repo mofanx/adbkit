@@ -1,5 +1,8 @@
 package com.adbkit.app.service
 
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
@@ -12,7 +15,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.DataInputStream
-import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -30,7 +32,8 @@ class ScreenStreamService {
 
     data class StreamConfig(
         val maxSize: Int = 720,
-        val bitrate: Int = 8_000_000
+        val bitrate: Int = 8_000_000,
+        val audioEnabled: Boolean = false
     )
 
     data class StreamState(
@@ -49,6 +52,8 @@ class ScreenStreamService {
         private const val DEVICE_SERVER_LOG = "/data/local/tmp/adbkit-server.log"
         private const val PACKET_FLAG_CONFIG = 1L shl 63
         private const val PACKET_FLAG_KEY_FRAME = 1L shl 62
+        private const val PACKET_FLAG_AUDIO = 1L shl 61
+        private const val AUDIO_SAMPLE_RATE = 48000
     }
 
     private val _state = MutableStateFlow(StreamState())
@@ -58,6 +63,8 @@ class ScreenStreamService {
     private var stderrJob: Job? = null
     private var decoderJob: Job? = null
     private var codec: MediaCodec? = null
+    private var audioCodec: MediaCodec? = null
+    private var audioTrack: AudioTrack? = null
     private val isRunning = AtomicBoolean(false)
     private var frameCount = 0
     private var lastFpsTime = 0L
@@ -120,8 +127,9 @@ class ScreenStreamService {
 
         // CRITICAL: redirect device stderr to log file, otherwise exec-out merges
         // stderr into stdout, corrupting the binary H.264 stream
+        val audioFlag = if (config.audioEnabled) "1" else "0"
         val serverCmd = "CLASSPATH=$DEVICE_SERVER_PATH app_process / ScreenServer" +
-                " ${config.maxSize} ${config.bitrate}" +
+                " ${config.maxSize} ${config.bitrate} $audioFlag" +
                 " 2>$DEVICE_SERVER_LOG"
         val cmd = buildString {
             append(adbPath)
@@ -206,9 +214,9 @@ class ScreenStreamService {
      */
     private suspend fun decodePacketLoop(dis: DataInputStream) {
         val metaBuf = ByteArray(12)
+        val ptsMask = PACKET_FLAG_CONFIG - 1 and (PACKET_FLAG_KEY_FRAME - 1) and (PACKET_FLAG_AUDIO - 1)
 
         while (isRunning.get() && currentCoroutineContext().isActive) {
-            // Read 12-byte packet meta
             val metaRead = readFully(dis, metaBuf, 0, 12)
             if (metaRead < 12) break
 
@@ -220,17 +228,20 @@ class ScreenStreamService {
                 break
             }
 
-            // Read packet data
             val packetData = ByteArray(packetSize)
             val dataRead = readFully(dis, packetData, 0, packetSize)
             if (dataRead < packetSize) break
 
+            val isAudio = (ptsAndFlags and PACKET_FLAG_AUDIO) != 0L
             val isConfig = (ptsAndFlags and PACKET_FLAG_CONFIG) != 0L
             val isKeyFrame = (ptsAndFlags and PACKET_FLAG_KEY_FRAME) != 0L
-            val pts = if (isConfig) 0L else (ptsAndFlags and (PACKET_FLAG_CONFIG - 1) and (PACKET_FLAG_KEY_FRAME - 1))
+            val pts = if (isConfig) 0L else (ptsAndFlags and ptsMask)
 
-            // Feed to decoder
-            feedPacket(packetData, pts, isConfig, isKeyFrame)
+            if (isAudio) {
+                feedAudioPacket(packetData, pts, isConfig)
+            } else {
+                feedPacket(packetData, pts, isConfig, isKeyFrame)
+            }
         }
     }
 
@@ -264,6 +275,72 @@ class ScreenStreamService {
         }
 
         drainDecoderOutput()
+    }
+
+    private fun feedAudioPacket(data: ByteArray, pts: Long, isConfig: Boolean) {
+        if (isConfig) {
+            // Initialize audio decoder and AudioTrack from config data
+            try {
+                if (audioCodec == null) {
+                    val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, AUDIO_SAMPLE_RATE, 2)
+                    format.setByteBuffer("csd-0", java.nio.ByteBuffer.wrap(data))
+                    audioCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
+                    audioCodec!!.configure(format, null, null, 0)
+                    audioCodec!!.start()
+
+                    val bufSize = AudioTrack.getMinBufferSize(AUDIO_SAMPLE_RATE,
+                        AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT)
+                    audioTrack = AudioTrack.Builder()
+                        .setAudioAttributes(AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build())
+                        .setAudioFormat(AudioFormat.Builder()
+                            .setSampleRate(AUDIO_SAMPLE_RATE)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .build())
+                        .setBufferSizeInBytes(bufSize.coerceAtLeast(4096) * 2)
+                        .setTransferMode(AudioTrack.MODE_STREAM)
+                        .build()
+                    audioTrack!!.play()
+                    Log.d(TAG, "Audio decoder+track initialized")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Audio init failed", e)
+            }
+            return
+        }
+
+        val ac = audioCodec ?: return
+        val at = audioTrack ?: return
+
+        // Feed AAC to decoder
+        val inputIndex = ac.dequeueInputBuffer(5_000)
+        if (inputIndex >= 0) {
+            val inputBuffer = ac.getInputBuffer(inputIndex) ?: return
+            inputBuffer.clear()
+            inputBuffer.put(data, 0, data.size)
+            ac.queueInputBuffer(inputIndex, 0, data.size, pts, 0)
+        }
+
+        // Drain decoded PCM to AudioTrack
+        val info = MediaCodec.BufferInfo()
+        while (true) {
+            val idx = try { ac.dequeueOutputBuffer(info, 1_000) } catch (_: Exception) { break }
+            if (idx >= 0) {
+                val outBuf = ac.getOutputBuffer(idx)
+                if (outBuf != null && info.size > 0) {
+                    val pcm = ByteArray(info.size)
+                    outBuf.position(info.offset)
+                    outBuf.get(pcm)
+                    at.write(pcm, 0, pcm.size)
+                }
+                ac.releaseOutputBuffer(idx, false)
+            } else {
+                break
+            }
+        }
     }
 
     private fun drainDecoderOutput() {
@@ -318,6 +395,10 @@ class ScreenStreamService {
         serverProcess = null
         try { codec?.stop(); codec?.release() } catch (_: Exception) {}
         codec = null
+        try { audioCodec?.stop(); audioCodec?.release() } catch (_: Exception) {}
+        audioCodec = null
+        try { audioTrack?.stop(); audioTrack?.release() } catch (_: Exception) {}
+        audioTrack = null
     }
 
     fun isStreaming(): Boolean = isRunning.get()

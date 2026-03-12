@@ -1,8 +1,11 @@
 import android.graphics.Rect;
 import android.hardware.display.VirtualDisplay;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
@@ -18,33 +21,43 @@ import java.nio.ByteOrder;
 
 /**
  * Scrcpy-compatible screen capture server for ADBKit.
- * Runs on the target device via: app_process / ScreenServer [maxSize] [bitrate]
+ * Runs on the target device via: app_process / ScreenServer [maxSize] [bitrate] [audio]
  *
  * Protocol (matching scrcpy):
  *   1. Video header:  8 bytes [width(4B BE)][height(4B BE)]
  *   2. Each packet:  12 bytes meta [pts_flags(8B BE)][packet_size(4B BE)] + [packet_data]
  *      - pts_flags bit 63: config packet (SPS/PPS)
  *      - pts_flags bit 62: key frame
+ *      - pts_flags bit 61: audio packet
  *      - remaining bits: presentation timestamp in microseconds
  *
  * Architecture (mirrors scrcpy SurfaceEncoder):
  *   1. Get display info via DisplayManagerGlobal (hidden API)
  *   2. Create virtual display (DisplayManager API, fallback to SurfaceControl)
  *   3. Encode screen via MediaCodec H.264 encoder with Surface input
- *   4. Write framed packets to stdout
+ *   4. Optionally capture audio via AudioRecord + AAC encoder
+ *   5. Write framed packets to stdout
  */
 public final class ScreenServer {
 
     private static final long PACKET_FLAG_CONFIG = 1L << 63;
     private static final long PACKET_FLAG_KEY_FRAME = 1L << 62;
+    private static final long PACKET_FLAG_AUDIO = 1L << 61;
 
     private static final int REPEAT_FRAME_DELAY_US = 100_000; // 100ms
     private static final int DEFAULT_I_FRAME_INTERVAL = 10; // seconds
     private static final int[] MAX_SIZE_FALLBACK = {2560, 1920, 1600, 1280, 1024, 800};
     private static final int MAX_CONSECUTIVE_ERRORS = 3;
 
+    private static final int AUDIO_SAMPLE_RATE = 48000;
+    private static final int AUDIO_CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_STEREO;
+    private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
+    private static final int AUDIO_BIT_RATE = 128_000;
+
     private static int displayWidth;
     private static int displayHeight;
+    private static volatile boolean running = true;
+    private static final Object outputLock = new Object();
 
     public static void main(String... args) {
         // Some devices deadlock if the encoding thread has no Looper (e.g. Meizu)
@@ -54,16 +67,18 @@ public final class ScreenServer {
         try {
             int maxSize = 720;
             int bitRate = 8_000_000;
+            boolean audioEnabled = false;
 
             if (args.length >= 1) maxSize = Integer.parseInt(args[0]);
             if (args.length >= 2) bitRate = Integer.parseInt(args[1]);
+            if (args.length >= 3) audioEnabled = "1".equals(args[2]);
 
-            log("Starting: maxSize=" + maxSize + " bitrate=" + bitRate);
+            log("Starting: maxSize=" + maxSize + " bitrate=" + bitRate + " audio=" + audioEnabled);
 
             getDisplaySize();
             log("Display: " + displayWidth + "x" + displayHeight);
 
-            streamWithFallback(maxSize, bitRate);
+            streamWithFallback(maxSize, bitRate, audioEnabled);
 
         } catch (Exception e) {
             log("Fatal: " + e.getMessage());
@@ -72,10 +87,10 @@ public final class ScreenServer {
         }
     }
 
-    private static void streamWithFallback(int maxSize, int bitRate) throws Exception {
+    private static void streamWithFallback(int maxSize, int bitRate, boolean audioEnabled) throws Exception {
         // Try requested size first
         try {
-            doStream(maxSize, bitRate);
+            doStream(maxSize, bitRate, audioEnabled);
             return;
         } catch (Exception e) {
             log("Failed at maxSize=" + maxSize + ": " + e.getMessage());
@@ -86,7 +101,7 @@ public final class ScreenServer {
             if (fallback >= maxSize) continue;
             try {
                 log("Retrying with -m" + fallback + "...");
-                doStream(fallback, bitRate);
+                doStream(fallback, bitRate, audioEnabled);
                 return;
             } catch (Exception e) {
                 log("Failed at maxSize=" + fallback + ": " + e.getMessage());
@@ -96,7 +111,7 @@ public final class ScreenServer {
         throw new RuntimeException("All resolutions failed");
     }
 
-    private static void doStream(int maxSize, int bitRate) throws Exception {
+    private static void doStream(int maxSize, int bitRate, boolean audioEnabled) throws Exception {
         int outWidth, outHeight;
         if (displayWidth > displayHeight) {
             outWidth = Math.min(maxSize, displayWidth);
@@ -151,16 +166,32 @@ public final class ScreenServer {
         codec.start();
         log("Streaming started");
 
+        // Start audio thread if enabled
+        Thread audioThread = null;
+        if (audioEnabled && Build.VERSION.SDK_INT >= 29) {
+            audioThread = new Thread(() -> {
+                try {
+                    captureAudio(rawOut);
+                } catch (Exception e) {
+                    log("Audio error: " + e.getMessage());
+                }
+            }, "audio-encoder");
+            audioThread.setDaemon(true);
+            audioThread.start();
+            log("Audio capture started");
+        } else if (audioEnabled) {
+            log("Audio capture requires Android 10+, skipping");
+        }
+
         // Main encode loop - mirrors scrcpy SurfaceEncoder.encode()
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
         boolean firstFrameSent = false;
         int consecutiveErrors = 0;
-        // Reusable 12-byte header buffer
         byte[] metaBuf = new byte[12];
 
         try {
             boolean eos = false;
-            while (!eos) {
+            while (!eos && running) {
                 int outputIndex;
                 try {
                     outputIndex = codec.dequeueOutputBuffer(bufferInfo, -1);
@@ -190,7 +221,6 @@ public final class ScreenServer {
                                 }
                             }
 
-                            // Write 12-byte frame meta: [pts_flags(8B)][size(4B)]
                             long ptsAndFlags;
                             if (isConfig) {
                                 ptsAndFlags = PACKET_FLAG_CONFIG;
@@ -204,18 +234,18 @@ public final class ScreenServer {
                             codecBuffer.position(bufferInfo.offset);
                             codecBuffer.limit(bufferInfo.offset + bufferInfo.size);
 
-                            // Write meta header
                             putBE64(metaBuf, 0, ptsAndFlags);
                             putBE32(metaBuf, 8, bufferInfo.size);
+                            byte[] data = new byte[bufferInfo.size];
+                            codecBuffer.get(data);
                             try {
-                                rawOut.write(metaBuf);
-                                // Write packet data
-                                byte[] data = new byte[bufferInfo.size];
-                                codecBuffer.get(data);
-                                rawOut.write(data);
-                                rawOut.flush();
+                                synchronized (outputLock) {
+                                    rawOut.write(metaBuf);
+                                    rawOut.write(data);
+                                    rawOut.flush();
+                                }
                             } catch (IOException e) {
-                                // Broken pipe - client disconnected
+                                running = false;
                                 break;
                             }
                         }
@@ -227,12 +257,138 @@ public final class ScreenServer {
                 }
             }
         } finally {
+            running = false;
             log("Stopping");
             try { codec.stop(); } catch (Exception ignored) {}
             codec.release();
             inputSurface.release();
             if (scDisplay != null) destroySurfaceControlDisplay(scDisplay);
             if (virtualDisplay != null) virtualDisplay.release();
+            if (audioThread != null) {
+                try { audioThread.join(2000); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    /**
+     * Capture internal audio using AudioRecord (Android 10+) and encode to AAC.
+     * Audio packets are written with PACKET_FLAG_AUDIO set in the flags field.
+     */
+    private static void captureAudio(FileOutputStream rawOut) throws Exception {
+        int bufferSize = AudioRecord.getMinBufferSize(AUDIO_SAMPLE_RATE,
+                AUDIO_CHANNEL_CONFIG, AUDIO_FORMAT);
+        if (bufferSize <= 0) bufferSize = 4096;
+        bufferSize = Math.max(bufferSize, 4096);
+
+        AudioRecord recorder = null;
+        try {
+            // Try REMOTE_SUBMIX source (internal audio capture, requires shell UID)
+            recorder = new AudioRecord(MediaRecorder.AudioSource.REMOTE_SUBMIX,
+                    AUDIO_SAMPLE_RATE, AUDIO_CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize * 2);
+        } catch (Exception e) {
+            log("REMOTE_SUBMIX failed: " + e.getMessage());
+        }
+
+        if (recorder == null || recorder.getState() != AudioRecord.STATE_INITIALIZED) {
+            if (recorder != null) { try { recorder.release(); } catch (Exception ignored) {} }
+            try {
+                recorder = new AudioRecord(MediaRecorder.AudioSource.MIC,
+                        AUDIO_SAMPLE_RATE, AUDIO_CHANNEL_CONFIG, AUDIO_FORMAT, bufferSize * 2);
+            } catch (Exception e) {
+                log("MIC fallback failed: " + e.getMessage());
+                return;
+            }
+        }
+
+        if (recorder.getState() != AudioRecord.STATE_INITIALIZED) {
+            log("AudioRecord init failed");
+            recorder.release();
+            return;
+        }
+
+        // Create AAC encoder
+        MediaFormat audioFormat = MediaFormat.createAudioFormat(
+                MediaFormat.MIMETYPE_AUDIO_AAC, AUDIO_SAMPLE_RATE, 2);
+        audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE,
+                MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+        audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, AUDIO_BIT_RATE);
+        audioFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, bufferSize);
+
+        MediaCodec audioCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
+        audioCodec.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        audioCodec.start();
+        recorder.startRecording();
+
+        log("Audio encoder: " + audioCodec.getName());
+
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        byte[] readBuf = new byte[bufferSize];
+        byte[] metaBuf = new byte[12];
+
+        try {
+            while (running) {
+                // Feed PCM to encoder
+                int inputIndex = audioCodec.dequeueInputBuffer(5000);
+                if (inputIndex >= 0) {
+                    ByteBuffer inputBuffer = audioCodec.getInputBuffer(inputIndex);
+                    if (inputBuffer != null) {
+                        int read = recorder.read(readBuf, 0, Math.min(readBuf.length, inputBuffer.remaining()));
+                        if (read > 0) {
+                            inputBuffer.clear();
+                            inputBuffer.put(readBuf, 0, read);
+                            audioCodec.queueInputBuffer(inputIndex, 0, read,
+                                    System.nanoTime() / 1000, 0);
+                        } else {
+                            audioCodec.queueInputBuffer(inputIndex, 0, 0,
+                                    System.nanoTime() / 1000, 0);
+                        }
+                    }
+                }
+
+                // Drain encoded output
+                int outputIndex;
+                while ((outputIndex = audioCodec.dequeueOutputBuffer(info, 1000)) >= 0) {
+                    if (info.size > 0) {
+                        ByteBuffer outBuf = audioCodec.getOutputBuffer(outputIndex);
+                        if (outBuf != null) {
+                            boolean isConfig = (info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0;
+
+                            long ptsAndFlags = PACKET_FLAG_AUDIO;
+                            if (isConfig) {
+                                ptsAndFlags |= PACKET_FLAG_CONFIG;
+                            } else {
+                                ptsAndFlags |= info.presentationTimeUs;
+                            }
+
+                            outBuf.position(info.offset);
+                            outBuf.limit(info.offset + info.size);
+                            byte[] data = new byte[info.size];
+                            outBuf.get(data);
+
+                            putBE64(metaBuf, 0, ptsAndFlags);
+                            putBE32(metaBuf, 8, info.size);
+
+                            try {
+                                synchronized (outputLock) {
+                                    rawOut.write(metaBuf);
+                                    rawOut.write(data);
+                                    rawOut.flush();
+                                }
+                            } catch (IOException e) {
+                                running = false;
+                                return;
+                            }
+                        }
+                    }
+                    audioCodec.releaseOutputBuffer(outputIndex, false);
+                }
+            }
+        } finally {
+            try { recorder.stop(); } catch (Exception ignored) {}
+            recorder.release();
+            try { audioCodec.stop(); } catch (Exception ignored) {}
+            audioCodec.release();
+            log("Audio stopped");
         }
     }
 

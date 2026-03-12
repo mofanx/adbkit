@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 data class RemoteControlUiState(
     val maxSize: String = "720",
     val bitrate: String = "8Mbps",
+    val keepAspectRatio: Boolean = true,
+    val navBarStyle: String = "floating", // "floating", "bottom", "hidden"
     val screenOff: Boolean = false,
     val audioEnabled: Boolean = false,
     val viewOnly: Boolean = false,
@@ -71,6 +73,8 @@ class RemoteControlViewModel : ViewModel() {
 
     fun setMaxSize(value: String) { _uiState.update { it.copy(maxSize = value) } }
     fun setBitrate(value: String) { _uiState.update { it.copy(bitrate = value) } }
+    fun setKeepAspectRatio(value: Boolean) { _uiState.update { it.copy(keepAspectRatio = value) } }
+    fun setNavBarStyle(value: String) { _uiState.update { it.copy(navBarStyle = value) } }
     fun setScreenOff(value: Boolean) { _uiState.update { it.copy(screenOff = value) } }
     fun setAudioEnabled(value: Boolean) { _uiState.update { it.copy(audioEnabled = value) } }
     fun setViewOnly(value: Boolean) { _uiState.update { it.copy(viewOnly = value) } }
@@ -93,15 +97,15 @@ class RemoteControlViewModel : ViewModel() {
     fun startH264Stream(surface: Surface) {
         val config = ScreenStreamService.StreamConfig(
             maxSize = parseMaxSize(),
-            bitrate = parseBitrate()
+            bitrate = parseBitrate(),
+            audioEnabled = _uiState.value.audioEnabled
         )
         streamService.startStream(surface, config, viewModelScope)
     }
 
     fun startRemoteControl() {
         if (_uiState.value.isConnected) {
-            stopStream()
-            _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected") }
+            disconnectRemoteControl()
             return
         }
         if (AdbService.getCurrentDevice() == null) {
@@ -114,7 +118,8 @@ class RemoteControlViewModel : ViewModel() {
             if (result.success) {
                 loadScreenSize()
                 if (_uiState.value.screenOff) {
-                    AdbService.shell("input keyevent 26")
+                    // scrcpy-style screen off: turn off display without locking
+                    setDeviceScreenPower(false)
                 }
                 _uiState.update {
                     it.copy(
@@ -124,7 +129,6 @@ class RemoteControlViewModel : ViewModel() {
                         isError = false
                     )
                 }
-                // Stream will be started when Surface becomes available in the UI
             } else {
                 _uiState.update {
                     it.copy(
@@ -135,6 +139,35 @@ class RemoteControlViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    fun disconnectRemoteControl() {
+        val wasScreenOff = _uiState.value.screenOff
+        stopStream()
+        viewModelScope.launch {
+            if (wasScreenOff) {
+                // Restore screen on disconnect
+                setDeviceScreenPower(true)
+            }
+        }
+        _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected") }
+    }
+
+    /**
+     * scrcpy-style screen power control using SurfaceControl.setDisplayPowerMode.
+     * Turns off the display without locking the device, saving battery.
+     */
+    private suspend fun setDeviceScreenPower(on: Boolean) {
+        // Use the same approach as scrcpy: call SurfaceControl.setDisplayPowerMode
+        // via shell command. Mode 0 = OFF, Mode 2 = ON
+        val mode = if (on) 2 else 0
+        // Try multiple approaches for compatibility
+        AdbService.shell(
+            "cmd display set-brightness 1 2>/dev/null; " +
+            "settings put system screen_brightness_mode 0 2>/dev/null; " +
+            "service call SurfaceFlinger 1035 i32 $mode 2>/dev/null; " +
+            if (!on) "input keyevent 26 2>/dev/null" else "input keyevent 224 2>/dev/null"
+        )
     }
 
     fun stopStream() {
