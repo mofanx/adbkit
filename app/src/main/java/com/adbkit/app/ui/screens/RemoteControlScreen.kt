@@ -312,7 +312,7 @@ private fun ScreenMirrorView(
             val density = LocalDensity.current
             val defaultOffset = remember(viewSize) {
                 if (viewSize.width > 0) {
-                    val navWidthPx = with(density) { 44.dp.toPx() }
+                    val navWidthPx = with(density) { 52.dp.toPx() }
                     Offset((viewSize.width - navWidthPx - 8f).coerceAtLeast(8f), 8f)
                 } else Offset(8f, 8f)
             }
@@ -364,8 +364,8 @@ private fun FloatingNavBar(
                 detectDragGestures(
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        val maxX = (containerSize.width - 44.dp.toPx()).coerceAtLeast(0f)
-                        val maxY = (containerSize.height - 44.dp.toPx()).coerceAtLeast(0f)
+                        val maxX = (containerSize.width - 52.dp.toPx()).coerceAtLeast(0f)
+                        val maxY = (containerSize.height - 52.dp.toPx()).coerceAtLeast(0f)
                         dragOffset = Offset(
                             (dragOffset.x + dragAmount.x).coerceIn(0f, maxX),
                             (dragOffset.y + dragAmount.y).coerceIn(0f, maxY)
@@ -383,48 +383,48 @@ private fun FloatingNavBar(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(2.dp)
+            modifier = Modifier.padding(4.dp)
         ) {
-            // Toggle button (smaller)
-            IconButton(onClick = onToggleExpand, modifier = Modifier.size(36.dp)) {
+            // Toggle button
+            IconButton(onClick = onToggleExpand, modifier = Modifier.size(44.dp)) {
                 Icon(
                     if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
             if (expanded) {
                 // Navigation buttons
-                IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(18.dp))
+                IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(22.dp))
                 }
-                IconButton(onClick = onHome, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.Home, contentDescription = "Home", modifier = Modifier.size(18.dp))
+                IconButton(onClick = onHome, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Filled.Home, contentDescription = "Home", modifier = Modifier.size(22.dp))
                 }
-                IconButton(onClick = onRecent, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent", modifier = Modifier.size(18.dp))
+                IconButton(onClick = onRecent, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent", modifier = Modifier.size(22.dp))
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Volume & Power
-                IconButton(onClick = onVolumeUp, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Vol+", modifier = Modifier.size(18.dp))
+                IconButton(onClick = onVolumeUp, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Vol+", modifier = Modifier.size(22.dp))
                 }
-                IconButton(onClick = onVolumeDown, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Vol-", modifier = Modifier.size(18.dp))
+                IconButton(onClick = onVolumeDown, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Vol-", modifier = Modifier.size(22.dp))
                 }
-                IconButton(onClick = onPower, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power", modifier = Modifier.size(18.dp))
+                IconButton(onClick = onPower, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power", modifier = Modifier.size(22.dp))
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Exit remote control
-                IconButton(onClick = onExit, modifier = Modifier.size(36.dp)) {
-                    Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                IconButton(onClick = onExit, modifier = Modifier.size(44.dp)) {
+                    Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -468,9 +468,9 @@ private fun SettingsView(
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingRow(
                         label = strings.resolution,
-                        value = uiState.resolution,
-                        options = listOf("480p", "720p", "1080p", "original"),
-                        onValueChange = { viewModel.setResolution(it) }
+                        value = uiState.maxSize,
+                        options = listOf("480", "720", "1080", "1440", "1920"),
+                        onValueChange = { viewModel.setMaxSize(it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -487,21 +487,6 @@ private fun SettingsView(
                         value = "${uiState.maxFps}fps",
                         options = listOf("10fps", "15fps", "20fps", "30fps", "60fps"),
                         onValueChange = { viewModel.setMaxFps(it.replace("fps", "")) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    val aspectMap = mapOf(
-                        "original" to strings.keepOriginal,
-                        "16:9" to "16:9",
-                        "4:3" to "4:3",
-                        "adaptive" to strings.adaptive
-                    )
-                    val aspectReverseMap = aspectMap.entries.associate { (k, v) -> v to k }
-                    SettingRow(
-                        label = strings.aspectRatio,
-                        value = aspectMap[uiState.aspectRatio] ?: uiState.aspectRatio,
-                        options = aspectMap.values.toList(),
-                        onValueChange = { viewModel.setAspectRatio(aspectReverseMap[it] ?: it) }
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

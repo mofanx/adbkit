@@ -73,6 +73,89 @@ android {
     }
 }
 
+// ── Build ScreenServer DEX for target device ──────────────────────────────────
+// Compiles server/src/ScreenServer.java → app/src/main/assets/screen-server.dex
+// using android.jar from the SDK and d8 from build-tools.
+val serverSrcDir = rootProject.layout.projectDirectory.dir("server/src")
+val serverBuildDir = layout.buildDirectory.dir("server")
+val assetsDir = layout.projectDirectory.dir("src/main/assets")
+
+tasks.register("compileScreenServer") {
+    val srcFile = serverSrcDir.file("ScreenServer.java")
+    val classesDir = serverBuildDir.map { it.dir("classes") }
+    inputs.file(srcFile)
+    outputs.dir(classesDir)
+
+    doLast {
+        val sdk = android.sdkDirectory
+        val androidJar = file("$sdk/platforms/android-${android.compileSdk}/android.jar")
+        require(androidJar.exists()) { "android.jar not found at $androidJar" }
+
+        val outDir = classesDir.get().asFile
+        outDir.mkdirs()
+
+        project.exec {
+            commandLine(
+                "javac",
+                "-source", "17", "-target", "17",
+                "-bootclasspath", androidJar.absolutePath,
+                "-classpath", androidJar.absolutePath,
+                "-d", outDir.absolutePath,
+                "-Xlint:-options",
+                srcFile.asFile.absolutePath
+            )
+        }
+    }
+}
+
+tasks.register("dexScreenServer") {
+    dependsOn("compileScreenServer")
+    val classesDir = serverBuildDir.map { it.dir("classes") }
+    val dexDir = serverBuildDir.map { it.dir("dex") }
+    inputs.dir(classesDir)
+    outputs.dir(dexDir)
+
+    doLast {
+        val sdk = android.sdkDirectory
+        // Find the latest build-tools version
+        val buildToolsDir = file("$sdk/build-tools")
+        val latestBt = buildToolsDir.listFiles()
+            ?.filter { it.isDirectory }
+            ?.maxByOrNull { it.name }
+            ?: error("No build-tools found in $buildToolsDir")
+        val d8 = file("${latestBt.absolutePath}/d8")
+        require(d8.exists()) { "d8 not found at $d8" }
+
+        val outDir = dexDir.get().asFile
+        outDir.mkdirs()
+
+        val classFiles = classesDir.get().asFile.walkTopDown()
+            .filter { it.extension == "class" }
+            .map { it.absolutePath }
+            .toList()
+
+        project.exec {
+            commandLine(
+                listOf(d8.absolutePath, "--output", outDir.absolutePath, "--min-api", "26") + classFiles
+            )
+        }
+    }
+}
+
+tasks.register<Copy>("copyScreenServerDex") {
+    dependsOn("dexScreenServer")
+    from(serverBuildDir.map { it.dir("dex") }) {
+        include("classes.dex")
+        rename("classes.dex", "screen-server.dex")
+    }
+    into(assetsDir)
+}
+
+// Hook into the build: ensure DEX is ready before app resources are merged
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
+    dependsOn("copyScreenServerDex")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

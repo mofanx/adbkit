@@ -13,12 +13,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class RemoteControlUiState(
-    val resolution: String = "720p",
+    val maxSize: String = "720",
     val bitrate: String = "8Mbps",
     val maxFps: String = "30",
-    val aspectRatio: String = "original",
-    val navBarPosition: String = "floating",
-    val fullscreen: Boolean = false,
     val screenOff: Boolean = false,
     val compatMode: Boolean = false,
     val isConnecting: Boolean = false,
@@ -29,6 +26,8 @@ data class RemoteControlUiState(
     val screenHeight: Int = 1920,
     val fps: Int = 0,
     val streamMode: String = "none",
+    val videoWidth: Int = 0,
+    val videoHeight: Int = 0,
     // Fallback bitmap for screencap mode
     val screenBitmap: Bitmap? = null,
     val bitmapWidth: Int = 0,
@@ -49,7 +48,9 @@ class RemoteControlViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         fps = streamState.fps,
-                        streamMode = streamState.streamMode
+                        streamMode = streamState.streamMode,
+                        videoWidth = streamState.videoWidth,
+                        videoHeight = streamState.videoHeight
                     )
                 }
             }
@@ -88,24 +89,14 @@ class RemoteControlViewModel : ViewModel() {
         }
     }
 
-    fun setResolution(value: String) { _uiState.update { it.copy(resolution = value) } }
+    fun setMaxSize(value: String) { _uiState.update { it.copy(maxSize = value) } }
     fun setBitrate(value: String) { _uiState.update { it.copy(bitrate = value) } }
     fun setMaxFps(value: String) { _uiState.update { it.copy(maxFps = value) } }
-    fun setAspectRatio(value: String) { _uiState.update { it.copy(aspectRatio = value) } }
-    fun setNavBarPosition(value: String) { _uiState.update { it.copy(navBarPosition = value) } }
-    fun setFullscreen(value: Boolean) { _uiState.update { it.copy(fullscreen = value) } }
     fun setScreenOff(value: Boolean) { _uiState.update { it.copy(screenOff = value) } }
     fun setCompatMode(value: Boolean) { _uiState.update { it.copy(compatMode = value) } }
 
-    private fun parseResolution(): Pair<Int, Int> {
-        val state = _uiState.value
-        return when (state.resolution) {
-            "480p" -> Pair(480, (480 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
-            "720p" -> Pair(720, (720 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
-            "1080p" -> Pair(1080, (1080 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
-            "original" -> Pair(state.screenWidth, state.screenHeight)
-            else -> Pair(720, (720 * state.screenHeight / state.screenWidth.coerceAtLeast(1)))
-        }
+    private fun parseMaxSize(): Int {
+        return _uiState.value.maxSize.toIntOrNull() ?: 720
     }
 
     private fun parseBitrate(): Int {
@@ -124,13 +115,10 @@ class RemoteControlViewModel : ViewModel() {
      * Called from the UI when the Surface is available.
      */
     fun startH264Stream(surface: Surface) {
-        val (w, h) = parseResolution()
         val config = ScreenStreamService.StreamConfig(
-            width = w,
-            height = h,
+            maxSize = parseMaxSize(),
             bitrate = parseBitrate(),
-            maxFps = _uiState.value.maxFps.toIntOrNull() ?: 30,
-            useH264 = true
+            maxFps = _uiState.value.maxFps.toIntOrNull() ?: 30
         )
         streamService.startStream(surface, config, viewModelScope)
     }
