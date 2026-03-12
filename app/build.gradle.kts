@@ -97,11 +97,9 @@ tasks.register("compileScreenServer") {
         project.exec {
             commandLine(
                 "javac",
-                "-source", "17", "-target", "17",
-                "-bootclasspath", androidJar.absolutePath,
+                "-source", "11", "-target", "11",
                 "-classpath", androidJar.absolutePath,
                 "-d", outDir.absolutePath,
-                "-Xlint:-options",
                 srcFile.asFile.absolutePath
             )
         }
