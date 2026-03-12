@@ -210,6 +210,14 @@ class RemoteControlViewModel : ViewModel() {
         }
     }
 
+    fun sendLongPressAt(xRatio: Float, yRatio: Float, duration: Int = 1000) {
+        val (x, y) = ratioToDeviceCoords(xRatio, yRatio)
+        viewModelScope.launch {
+            // Long press = swipe at same position with duration
+            AdbService.inputSwipe(x, y, x, y, duration)
+        }
+    }
+
     fun sendSwipeAt(x1Ratio: Float, y1Ratio: Float, x2Ratio: Float, y2Ratio: Float, duration: Int = 300) {
         val (x1, y1) = ratioToDeviceCoords(x1Ratio, y1Ratio)
         val (x2, y2) = ratioToDeviceCoords(x2Ratio, y2Ratio)

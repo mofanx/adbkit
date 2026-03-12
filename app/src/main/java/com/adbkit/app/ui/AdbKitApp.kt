@@ -1,6 +1,8 @@
 package com.adbkit.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -153,10 +155,23 @@ private fun AdbKitContent() {
                     }
                 )
             } else {
-                ModalDrawerSheet(modifier = Modifier.width(300.dp)) {}
+                ModalDrawerSheet(modifier = Modifier.width(240.dp)) {}
             }
         }
     ) {
+        // Click outside drawer to close
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = drawerState.isOpen
+                    ) {
+                        scope.launch { drawerState.close() }
+                    }
+            ) {
         when (currentView) {
             "home" -> {
                 HomeScreen(
@@ -183,6 +198,8 @@ private fun AdbKitContent() {
                 FastbootScreen(onMenuClick = { currentView = "home" })
             }
         }
+            }
+        }
     }
 }
 
@@ -198,26 +215,26 @@ private fun DrawerContent(
 ) {
     val scope = rememberCoroutineScope()
 
-    ModalDrawerSheet(modifier = Modifier.width(300.dp)) {
+    ModalDrawerSheet(modifier = Modifier.width(240.dp)) {
         // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp)
+                .padding(16.dp)
         ) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.PhoneAndroid,
                         contentDescription = null,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(36.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = strings.appName,
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(

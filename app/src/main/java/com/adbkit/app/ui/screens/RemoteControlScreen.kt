@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,6 +64,16 @@ private fun ScreenMirrorView(
     var dragEnd by remember { mutableStateOf(Offset.Zero) }
     var showControls by remember { mutableStateOf(true) }
     var surfaceReady by remember { mutableStateOf(false) }
+    var currentSurface by remember { mutableStateOf<Surface?>(null) }
+    var navBarExpanded by remember { mutableStateOf(true) }
+    var navBarOffset by remember { mutableStateOf(Offset(16f, 200f)) }
+
+    // Start stream when both connected and surface ready
+    LaunchedEffect(uiState.isConnected, surfaceReady, currentSurface) {
+        if (uiState.isConnected && surfaceReady && currentSurface != null) {
+            viewModel.startH264Stream(currentSurface!!)
+        }
+    }
 
     // Stop stream when leaving this composable
     DisposableEffect(Unit) {
@@ -100,44 +111,7 @@ private fun ScreenMirrorView(
                 )
             }
         },
-        bottomBar = {
-            if (showControls && uiState.navBarPosition != "hidden") {
-                Surface(tonalElevation = 3.dp) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilledTonalButton(onClick = { viewModel.sendKey(4) }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(strings.btnBack)
-                        }
-                        FilledTonalButton(onClick = { viewModel.sendKey(3) }) {
-                            Icon(Icons.Filled.Home, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(strings.btnHome)
-                        }
-                        FilledTonalButton(onClick = { viewModel.sendKey(187) }) {
-                            Icon(Icons.AutoMirrored.Filled.ViewList, null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(strings.btnRecent)
-                        }
-                        IconButton(onClick = { viewModel.sendKey(25) }) {
-                            Icon(Icons.AutoMirrored.Filled.VolumeDown, strings.keyVolDown)
-                        }
-                        IconButton(onClick = { viewModel.sendKey(24) }) {
-                            Icon(Icons.AutoMirrored.Filled.VolumeUp, strings.keyVolUp)
-                        }
-                        IconButton(onClick = { viewModel.sendKey(26) }) {
-                            Icon(Icons.Filled.PowerSettingsNew, strings.keyPower)
-                        }
-                    }
-                }
-            }
-        }
+        bottomBar = {}
     ) { padding ->
         Box(
             modifier = Modifier
@@ -155,11 +129,12 @@ private fun ScreenMirrorView(
                         holder.addCallback(object : SurfaceHolder.Callback {
                             override fun surfaceCreated(holder: SurfaceHolder) {
                                 surfaceReady = true
-                                viewModel.startH264Stream(holder.surface)
+                                currentSurface = holder.surface
                             }
                             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
                             override fun surfaceDestroyed(holder: SurfaceHolder) {
                                 surfaceReady = false
+                                currentSurface = null
                             }
                         })
                     }
@@ -175,8 +150,16 @@ private fun ScreenMirrorView(
                                     viewModel.sendTapAt(xRatio, yRatio)
                                 }
                             },
-                            onLongPress = {
+                            onDoubleTap = {
                                 showControls = !showControls
+                            },
+                            onLongPress = { offset ->
+                                // Forward long press to remote device
+                                if (viewSize.width > 0 && viewSize.height > 0) {
+                                    val xRatio = (offset.x / viewSize.width).coerceIn(0f, 1f)
+                                    val yRatio = (offset.y / viewSize.height).coerceIn(0f, 1f)
+                                    viewModel.sendLongPressAt(xRatio, yRatio)
+                                }
                             }
                         )
                     }
@@ -234,8 +217,25 @@ private fun ScreenMirrorView(
                                             viewModel.sendTapAt(xRatio, yRatio)
                                         }
                                     },
-                                    onLongPress = {
+                                    onDoubleTap = {
                                         showControls = !showControls
+                                    },
+                                    onLongPress = { offset ->
+                                        if (viewSize.width > 0 && viewSize.height > 0) {
+                                            val bw = uiState.bitmapWidth.takeIf { it > 0 } ?: viewSize.width
+                                            val bh = uiState.bitmapHeight.takeIf { it > 0 } ?: viewSize.height
+                                            val scale = minOf(
+                                                viewSize.width.toFloat() / bw,
+                                                viewSize.height.toFloat() / bh
+                                            )
+                                            val imgW = bw * scale
+                                            val imgH = bh * scale
+                                            val offsetX = (viewSize.width - imgW) / 2f
+                                            val offsetY = (viewSize.height - imgH) / 2f
+                                            val xRatio = ((offset.x - offsetX) / imgW).coerceIn(0f, 1f)
+                                            val yRatio = ((offset.y - offsetY) / imgH).coerceIn(0f, 1f)
+                                            viewModel.sendLongPressAt(xRatio, yRatio)
+                                        }
                                     }
                                 )
                             }
@@ -299,6 +299,118 @@ private fun ScreenMirrorView(
                         .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
+            }
+
+            // Floating draggable navigation bar
+            if (showControls) {
+                FloatingNavBar(
+                    expanded = navBarExpanded,
+                    offset = navBarOffset,
+                    onToggleExpand = { navBarExpanded = !navBarExpanded },
+                    onOffsetChange = { navBarOffset = it },
+                    onBack = { viewModel.sendKey(4) },
+                    onHome = { viewModel.sendKey(3) },
+                    onRecent = { viewModel.sendKey(187) },
+                    onVolumeDown = { viewModel.sendKey(25) },
+                    onVolumeUp = { viewModel.sendKey(24) },
+                    onPower = { viewModel.sendKey(26) },
+                    onExit = { viewModel.startRemoteControl() },
+                    modifier = Modifier.align(Alignment.TopStart)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingNavBar(
+    expanded: Boolean,
+    offset: Offset,
+    onToggleExpand: () -> Unit,
+    onOffsetChange: (Offset) -> Unit,
+    onBack: () -> Unit,
+    onHome: () -> Unit,
+    onRecent: () -> Unit,
+    onVolumeDown: () -> Unit,
+    onVolumeUp: () -> Unit,
+    onPower: () -> Unit,
+    onExit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var dragOffset by remember { mutableStateOf(offset) }
+
+    LaunchedEffect(offset) {
+        dragOffset = offset
+    }
+
+    Surface(
+        modifier = modifier
+            .offset { IntOffset(dragOffset.x.toInt(), dragOffset.y.toInt()) }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffset = Offset(
+                            (dragOffset.x + dragAmount.x).coerceIn(0f, size.width - 56f),
+                            (dragOffset.y + dragAmount.y).coerceIn(0f, size.height - 400f)
+                        )
+                    },
+                    onDragEnd = {
+                        onOffsetChange(dragOffset)
+                    }
+                )
+            },
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(4.dp)
+        ) {
+            // Toggle button
+            IconButton(onClick = onToggleExpand, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (expanded) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // Navigation buttons
+                IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                IconButton(onClick = onHome, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.Home, contentDescription = "Home")
+                }
+                IconButton(onClick = onRecent, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent")
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // Volume & Power
+                IconButton(onClick = onVolumeUp, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume Up")
+                }
+                IconButton(onClick = onVolumeDown, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Volume Down")
+                }
+                IconButton(onClick = onPower, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power")
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                // Exit remote control
+                IconButton(onClick = onExit, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
@@ -378,20 +490,6 @@ private fun SettingsView(
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-                    val navMap = mapOf(
-                        "floating" to strings.floating,
-                        "bottom" to strings.bottom,
-                        "hidden" to strings.hidden
-                    )
-                    val navReverseMap = navMap.entries.associate { (k, v) -> v to k }
-                    SettingRow(
-                        label = strings.navBarPosition,
-                        value = navMap[uiState.navBarPosition] ?: uiState.navBarPosition,
-                        options = navMap.values.toList(),
-                        onValueChange = { viewModel.setNavBarPosition(navReverseMap[it] ?: it) }
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
                     ToggleRow(
                         label = strings.screenOffControl,
                         checked = uiState.screenOff,
@@ -404,23 +502,6 @@ private fun SettingsView(
                         checked = uiState.compatMode,
                         onCheckedChange = { viewModel.setCompatMode(it) }
                     )
-                }
-            }
-
-            // Tips card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(strings.usageGuide, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(strings.usageTip1, style = MaterialTheme.typography.bodySmall)
-                    Text(strings.usageTip2, style = MaterialTheme.typography.bodySmall)
-                    Text(strings.usageTip3, style = MaterialTheme.typography.bodySmall)
-                    Text(strings.usageTip4, style = MaterialTheme.typography.bodySmall)
-                    Text(strings.usageTip5, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
