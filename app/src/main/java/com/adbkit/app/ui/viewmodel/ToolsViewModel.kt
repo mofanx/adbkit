@@ -178,18 +178,22 @@ class ToolsViewModel : ViewModel() {
 
     private fun toggleBluetooth() {
         viewModelScope.launch {
-            val result = AdbService.toggleBluetooth(true)
+            val status = AdbService.getBluetoothStatus()
+            val currentlyOn = !status.output.contains("OFF", ignoreCase = true) && status.output.contains("ON", ignoreCase = true)
+            val result = AdbService.toggleBluetooth(!currentlyOn)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Bluetooth toggled" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Bluetooth ${if (!currentlyOn) "ON" else "OFF"}" else "Failed: ${result.error}")
             }
         }
     }
 
     private fun toggleAirplane() {
         viewModelScope.launch {
-            val result = AdbService.toggleAirplaneMode(true)
+            val status = AdbService.getAirplaneModeStatus()
+            val currentlyOn = status.output.trim() == "1"
+            val result = AdbService.toggleAirplaneMode(!currentlyOn)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Airplane mode toggled" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) "Airplane mode ${if (!currentlyOn) "ON" else "OFF"}" else "Failed: ${result.error}")
             }
         }
     }

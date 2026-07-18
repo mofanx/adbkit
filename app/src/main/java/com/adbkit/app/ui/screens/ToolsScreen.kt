@@ -104,6 +104,7 @@ fun ToolsScreen(
                 onSend = { code -> viewModel.sendKeyEvent(code) }
             )
             "brightness" -> BrightnessDialog(
+                currentBrightness = uiState.currentBrightness,
                 onDismiss = { viewModel.dismissDialog() },
                 onSet = { value -> viewModel.setBrightness(value) }
             )
@@ -287,9 +288,10 @@ fun KeyEventDialog(onDismiss: () -> Unit, onSend: (Int) -> Unit) {
 }
 
 @Composable
-fun BrightnessDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
+fun BrightnessDialog(currentBrightness: String, onDismiss: () -> Unit, onSet: (Int) -> Unit) {
     val strings = LocalStrings.current
-    var brightness by remember { mutableFloatStateOf(128f) }
+    val initial = currentBrightness.toFloatOrNull()?.coerceIn(0f, 255f) ?: 128f
+    var brightness by remember(currentBrightness) { mutableFloatStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(strings.screenBrightness) },
