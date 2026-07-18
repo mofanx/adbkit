@@ -30,7 +30,10 @@ data class HomeUiState(
     val showHistoryDropdown: Boolean = false,
     val isScanning: Boolean = false,
     val showScanDialog: Boolean = false,
-    val scannedDevices: List<String> = emptyList()
+    val scannedDevices: List<String> = emptyList(),
+    val scanStartPort: String = "37000",
+    val scanEndPort: String = "44000",
+    val scanTimeoutMs: String = "200"
 )
 
 class HomeViewModel : ViewModel() {
@@ -146,8 +149,9 @@ class HomeViewModel : ViewModel() {
     }
 
     fun scanDevices() {
-        _uiState.update { it.copy(isScanning = true, scannedDevices = emptyList(), showScanDialog = true) }
+        _uiState.update { it.copy(isScanning = true, scannedDevices = emptyList()) }
         viewModelScope.launch {
+            val state = _uiState.value
             val localIp = getLocalIpAddress()
 
             if (localIp.isNullOrEmpty()) {
@@ -157,6 +161,9 @@ class HomeViewModel : ViewModel() {
 
             val subnet = localIp.substringBeforeLast(".")
             val found = java.util.concurrent.CopyOnWriteArrayList<String>()
+            val startPort = state.scanStartPort.toIntOrNull()?.coerceIn(1, 65535) ?: 37000
+            val endPort = state.scanEndPort.toIntOrNull()?.coerceIn(1, 65535) ?: 44000
+            val timeoutMs = state.scanTimeoutMs.toIntOrNull()?.coerceIn(50, 5000) ?: 200
 
             withContext(Dispatchers.IO) {
                 // Phase 1: Try adb mdns discovery first (fastest & most reliable)
@@ -177,7 +184,7 @@ class HomeViewModel : ViewModel() {
                         if (ip == localIp) return@async null
                         try {
                             val sock = java.net.Socket()
-                            sock.connect(java.net.InetSocketAddress(ip, 5555), 300)
+                            sock.connect(java.net.InetSocketAddress(ip, 5555), timeoutMs)
                             sock.close()
                             "$ip:5555"
                         } catch (_: Exception) { null }
@@ -195,19 +202,20 @@ class HomeViewModel : ViewModel() {
                         val ip = "$subnet.$i"
                         if (ip == localIp || ip in knownHosts) return@async null
                         try {
-                            if (java.net.InetAddress.getByName(ip).isReachable(200)) ip else null
+                            if (java.net.InetAddress.getByName(ip).isReachable(timeoutMs)) ip else null
                         } catch (_: Exception) { null }
                     }
                 }.awaitAll().filterNotNull()
                 knownHosts.addAll(pingHosts)
 
-                // For all known live hosts, scan wireless debug port range (37000-44000, step 100)
+                // For all known live hosts, scan wireless debug port range (configurable)
+                val range = if (startPort <= endPort) startPort..endPort else endPort..startPort
                 val wifiDebugJobs = knownHosts.flatMap { ip ->
-                    (37000..44000 step 100).map { port ->
+                    range.step(100).map { port ->
                         async {
                             try {
                                 val sock = java.net.Socket()
-                                sock.connect(java.net.InetSocketAddress(ip, port), 200)
+                                sock.connect(java.net.InetSocketAddress(ip, port), timeoutMs)
                                 sock.close()
                                 "$ip:$port"
                             } catch (_: Exception) { null }
@@ -226,6 +234,22 @@ class HomeViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    fun updateScanStartPort(port: String) {
+        _uiState.update { it.copy(scanStartPort = port) }
+    }
+
+    fun updateScanEndPort(port: String) {
+        _uiState.update { it.copy(scanEndPort = port) }
+    }
+
+    fun updateScanTimeoutMs(timeout: String) {
+        _uiState.update { it.copy(scanTimeoutMs = timeout) }
+    }
+
+    fun showScanConfig() {
+        _uiState.update { it.copy(showScanDialog = true, isScanning = false, scannedDevices = emptyList()) }
     }
 
     fun dismissScanDialog() {
@@ -259,8 +283,16 @@ class HomeViewModel : ViewModel() {
             _uiState.update { it.copy(showPairDialog = false, statusMessage = "Pairing...") }
             val result = AdbService.executeCommand("${AdbService.getAdbPath()} pair $ip:$port $code")
             if (result.success && result.output.contains("Successfully")) {
-                _uiState.update { it.copy(statusMessage = "Pairing successful", isError = false) }
+                _uiState.update {
+                    it.copy(
+                        statusMessage = "Pairing successful, connecting...",
+                        isError = false,
+                        ipAddress = "$ip:$port"
+                    )
+                }
                 refreshDevices()
+                // Auto connect after pairing
+                connectDevice()
             } else {
                 _uiState.update {
                     it.copy(statusMessage = result.error.ifEmpty { "Pairing failed" }, isError = true)

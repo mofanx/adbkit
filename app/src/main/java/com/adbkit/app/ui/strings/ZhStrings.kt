@@ -345,6 +345,10 @@ object ZhStrings : AppStrings {
     override val scanResult = { count: Int -> "发现 $count 个设备" }
     override val noDevicesFound = "未发现设备"
     override val scanLan = "扫描局域网"
+    override val startPort = "起始端口"
+    override val endPort = "结束端口"
+    override val timeout = "超时 (ms)"
+    override val startScan = "开始扫描"
 
     // Device click target
     override val deviceClickTarget = "设备点击跳转"

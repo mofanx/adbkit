@@ -143,7 +143,7 @@ fun HomeScreen(
                         }
                     },
                     trailingIcon = {
-                        IconButton(onClick = { viewModel.scanDevices() }) {
+                        IconButton(onClick = { viewModel.showScanConfig() }) {
                             if (uiState.isScanning) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
@@ -271,8 +271,15 @@ fun HomeScreen(
             ScanDevicesDialog(
                 isScanning = uiState.isScanning,
                 devices = uiState.scannedDevices,
+                startPort = uiState.scanStartPort,
+                endPort = uiState.scanEndPort,
+                timeout = uiState.scanTimeoutMs,
                 onDismiss = { viewModel.dismissScanDialog() },
-                onConnect = { viewModel.connectScannedDevice(it) }
+                onConnect = { viewModel.connectScannedDevice(it) },
+                onStartPortChange = { viewModel.updateScanStartPort(it) },
+                onEndPortChange = { viewModel.updateScanEndPort(it) },
+                onTimeoutChange = { viewModel.updateScanTimeoutMs(it) },
+                onStartScan = { viewModel.scanDevices() }
             )
         }
     }
@@ -401,8 +408,15 @@ fun WirelessPairDialog(
 fun ScanDevicesDialog(
     isScanning: Boolean,
     devices: List<String>,
+    startPort: String,
+    endPort: String,
+    timeout: String,
     onDismiss: () -> Unit,
-    onConnect: (String) -> Unit
+    onConnect: (String) -> Unit,
+    onStartPortChange: (String) -> Unit,
+    onEndPortChange: (String) -> Unit,
+    onTimeoutChange: (String) -> Unit,
+    onStartScan: () -> Unit
 ) {
     val strings = LocalStrings.current
     AlertDialog(
@@ -429,6 +443,38 @@ fun ScanDevicesDialog(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = startPort,
+                            onValueChange = onStartPortChange,
+                            label = { Text(strings.startPort) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = endPort,
+                            onValueChange = onEndPortChange,
+                            label = { Text(strings.endPort) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                    }
+                    OutlinedTextField(
+                        value = timeout,
+                        onValueChange = onTimeoutChange,
+                        label = { Text(strings.timeout) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Button(
+                        onClick = onStartScan,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(strings.startScan)
+                    }
                 } else {
                     Text(
                         text = strings.scanResult(devices.size),

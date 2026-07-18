@@ -360,6 +360,10 @@ interface AppStrings {
     val scanResult: (Int) -> String
     val noDevicesFound: String
     val scanLan: String
+    val startPort: String
+    val endPort: String
+    val timeout: String
+    val startScan: String
 
     // Device click target settings
     val deviceClickTarget: String

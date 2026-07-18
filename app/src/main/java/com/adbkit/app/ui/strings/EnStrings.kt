@@ -345,6 +345,10 @@ object EnStrings : AppStrings {
     override val scanResult = { count: Int -> "Found $count device(s)" }
     override val noDevicesFound = "No devices found"
     override val scanLan = "Scan LAN"
+    override val startPort = "Start Port"
+    override val endPort = "End Port"
+    override val timeout = "Timeout (ms)"
+    override val startScan = "Start Scan"
 
     // Device click target
     override val deviceClickTarget = "Device click target"
