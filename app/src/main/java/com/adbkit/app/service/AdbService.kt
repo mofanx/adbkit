@@ -68,6 +68,19 @@ object AdbService {
      * Get HOME directory for ADB server.
      * ADB needs $HOME/.android for auth keys. The default /data is not writable.
      */
+    private fun mapBatteryHealth(health: Int): String {
+        return when (health) {
+            1 -> "UNKNOWN"
+            2 -> "GOOD"
+            3 -> "OVERHEAT"
+            4 -> "DEAD"
+            5 -> "OVER_VOLTAGE"
+            6 -> "UNSPECIFIED_FAILURE"
+            7 -> "COLD"
+            else -> "UNKNOWN"
+        }
+    }
+
     private fun getAdbHome(): String {
         return AdbKitApplication.instance.filesDir.absolutePath
     }
@@ -235,8 +248,38 @@ object AdbService {
                         val status = trimmed.substringAfter(":").trim()
                         result["battery_status"] = status
                     }
+                    trimmed.startsWith("health:") -> {
+                        val health = trimmed.substringAfter(":").trim().toIntOrNull()
+                        result["battery_health"] = mapBatteryHealth(health ?: -1)
+                    }
                 }
             }
+        }
+
+        // Screen refresh rate
+        val displayInfo = shell("dumpsys display | grep -E '([0-9]+\\.[0-9]+)\\s*Hz' | head -1")
+        if (displayInfo.success) {
+            val match = Regex("([0-9]+\\.[0-9]+)\\s*Hz").find(displayInfo.output)
+            match?.let { result["screen_refresh_rate"] = "${it.groupValues[1]} Hz" }
+        }
+
+        // GPU renderer
+        val gpuInfo = shell("dumpsys SurfaceFlinger | grep 'GLES:'")
+        if (gpuInfo.success) {
+            val gpuLine = gpuInfo.output.substringAfter("GLES:").trim()
+            val gpuParts = gpuLine.split(",").map { it.trim() }
+            if (gpuParts.size >= 2) {
+                result["gpu"] = gpuParts[1]
+            } else if (gpuParts.isNotEmpty()) {
+                result["gpu"] = gpuParts[0]
+            }
+        }
+
+        // Camera count
+        val cameraInfo = shell("dumpsys media.camera | grep 'Number of camera devices:'")
+        if (cameraInfo.success) {
+            val count = cameraInfo.output.substringAfter(":").trim().toIntOrNull()
+            if (count != null) result["camera_count"] = count.toString()
         }
 
         val memInfo = shell("cat /proc/meminfo")
