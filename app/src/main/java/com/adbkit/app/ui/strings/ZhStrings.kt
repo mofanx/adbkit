@@ -360,6 +360,12 @@ object ZhStrings : AppStrings {
     override val endPort = "结束端口"
     override val timeout = "超时 (ms)"
     override val startScan = "开始扫描"
+    override val welcomeTitle = "欢迎使用 ADB Kit"
+    override val welcomeDescription = "通过 USB 或 WiFi 连接到另一台 Android 设备，开始使用。"
+    override val welcomeStep1 = "在目标设备上开启 USB 调试或无线调试"
+    override val welcomeStep2 = "输入 IP 地址点击连接，或使用扫描局域网"
+    override val welcomeStep3 = "如有存储权限提示，请授权以便管理本地文件"
+    override val help = "帮助"
 
     // Device click target
     override val deviceClickTarget = "设备点击跳转"

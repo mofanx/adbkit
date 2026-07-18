@@ -360,6 +360,12 @@ object EnStrings : AppStrings {
     override val endPort = "End Port"
     override val timeout = "Timeout (ms)"
     override val startScan = "Start Scan"
+    override val welcomeTitle = "Welcome to ADB Kit"
+    override val welcomeDescription = "Connect to another Android device via USB or WiFi to get started."
+    override val welcomeStep1 = "Enable USB debugging or wireless debugging on target device"
+    override val welcomeStep2 = "Enter IP address and tap Connect, or use Scan LAN"
+    override val welcomeStep3 = "Grant storage permission if asked to manage local files"
+    override val help = "Help"
 
     // Device click target
     override val deviceClickTarget = "Device click target"

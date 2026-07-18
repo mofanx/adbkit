@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.service.AdbBinaryManager
+import com.adbkit.app.ui.components.WelcomePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.HomeViewModel
 
@@ -218,45 +219,52 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Connected devices count
-            if (uiState.connectedDevices.isNotEmpty()) {
-                Text(
-                    text = strings.connectedDevices(uiState.connectedDevices.size),
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium
+            if (uiState.connectedDevices.isEmpty() && !uiState.isConnecting) {
+                WelcomePlaceholder(
+                    onScan = { viewModel.showScanConfig() },
+                    modifier = Modifier.weight(1f)
                 )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Device list
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(uiState.connectedDevices) { device ->
-                    DeviceCard(
-                        device = device,
-                        isSelected = device == uiState.selectedDevice,
-                        onClick = {
-                            viewModel.selectDevice(device)
-                            onDeviceClick(device)
-                        },
-                        onDisconnect = { viewModel.disconnectDevice(device) }
+            } else {
+                // Connected devices count
+                if (uiState.connectedDevices.isNotEmpty()) {
+                    Text(
+                        text = strings.connectedDevices(uiState.connectedDevices.size),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
-            }
 
-            // Dashboard for the selected device
-            if (uiState.connectedDevices.isNotEmpty() && !uiState.isLoadingDashboard) {
-                Spacer(modifier = Modifier.height(16.dp))
-                DashboardCard(
-                    info = uiState.dashboardInfo,
-                    onRefresh = { viewModel.loadDashboard() }
-                )
-            } else if (uiState.isLoadingDashboard) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                // Device list
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    items(uiState.connectedDevices) { device ->
+                        DeviceCard(
+                            device = device,
+                            isSelected = device == uiState.selectedDevice,
+                            onClick = {
+                                viewModel.selectDevice(device)
+                                onDeviceClick(device)
+                            },
+                            onDisconnect = { viewModel.disconnectDevice(device) }
+                        )
+                    }
+                }
+
+                // Dashboard for the selected device
+                if (uiState.connectedDevices.isNotEmpty() && !uiState.isLoadingDashboard) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    DashboardCard(
+                        info = uiState.dashboardInfo,
+                        onRefresh = { viewModel.loadDashboard() }
+                    )
+                } else if (uiState.isLoadingDashboard) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
                 }
             }
 

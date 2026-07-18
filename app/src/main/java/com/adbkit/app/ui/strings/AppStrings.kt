@@ -376,6 +376,14 @@ interface AppStrings {
     val timeout: String
     val startScan: String
 
+    // Onboarding / Welcome
+    val welcomeTitle: String
+    val welcomeDescription: String
+    val welcomeStep1: String
+    val welcomeStep2: String
+    val welcomeStep3: String
+    val help: String
+
     // Device click target settings
     val deviceClickTarget: String
     val deviceClickTargetDesc: String
