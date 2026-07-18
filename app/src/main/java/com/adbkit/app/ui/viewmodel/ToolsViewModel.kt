@@ -17,7 +17,8 @@ data class ToolsUiState(
     val commandOutput: String = "",
     val isLoading: Boolean = false,
     val isRecording: Boolean = false,
-    val lastScreenshotPath: String = ""
+    val lastScreenshotPath: String = "",
+    val currentBrightness: String = ""
 )
 
 class ToolsViewModel : ViewModel() {
@@ -33,7 +34,7 @@ class ToolsViewModel : ViewModel() {
             "reboot" -> _uiState.update { it.copy(activeDialog = "reboot") }
             "input_text" -> _uiState.update { it.copy(activeDialog = "input_text") }
             "key_event" -> _uiState.update { it.copy(activeDialog = "key_event") }
-            "brightness" -> _uiState.update { it.copy(activeDialog = "brightness") }
+            "brightness" -> loadBrightnessAndShowDialog()
             "screen_timeout" -> setScreenTimeout()
             "wifi" -> toggleWifi()
             "bluetooth" -> toggleBluetooth()
@@ -52,6 +53,14 @@ class ToolsViewModel : ViewModel() {
 
     fun dismissDialog() {
         _uiState.update { it.copy(activeDialog = "") }
+    }
+
+    private fun loadBrightnessAndShowDialog() {
+        viewModelScope.launch {
+            val result = AdbService.getScreenBrightness()
+            val current = if (result.success) result.output.trim() else ""
+            _uiState.update { it.copy(activeDialog = "brightness", currentBrightness = current) }
+        }
     }
 
     fun clearStatus() {

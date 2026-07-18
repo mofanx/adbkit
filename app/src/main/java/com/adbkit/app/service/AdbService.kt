@@ -488,6 +488,10 @@ object AdbService {
         return shell("settings put system screen_brightness $value")
     }
 
+    suspend fun getScreenBrightness(): CommandResult {
+        return shell("settings get system screen_brightness")
+    }
+
     suspend fun setScreenTimeout(ms: Int): CommandResult {
         return shell("settings put system screen_off_timeout $ms")
     }
@@ -500,8 +504,16 @@ object AdbService {
         return shell("svc wifi ${if (enable) "enable" else "disable"}")
     }
 
+    suspend fun getBluetoothStatus(): CommandResult {
+        return shell("dumpsys bluetooth_manager | grep -i 'state:' | head -1")
+    }
+
     suspend fun toggleBluetooth(enable: Boolean): CommandResult {
         return shell("svc bluetooth ${if (enable) "enable" else "disable"}")
+    }
+
+    suspend fun getAirplaneModeStatus(): CommandResult {
+        return shell("settings get global airplane_mode_on")
     }
 
     suspend fun toggleAirplaneMode(enable: Boolean): CommandResult {
