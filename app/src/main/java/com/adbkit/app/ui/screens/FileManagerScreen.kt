@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -297,6 +298,56 @@ fun FileManagerScreen(
 }
 
 @Composable
+private fun getFileIcon(name: String, isDir: Boolean): Pair<ImageVector, androidx.compose.ui.graphics.Color> {
+    val primary = MaterialTheme.colorScheme.primary
+    val imageColor = androidx.compose.ui.graphics.Color(0xFF4CAF50)
+    val videoColor = androidx.compose.ui.graphics.Color(0xFFF44336)
+    val audioColor = androidx.compose.ui.graphics.Color(0xFF9C27B0)
+    val codeColor = androidx.compose.ui.graphics.Color(0xFF2196F3)
+    val textColor = androidx.compose.ui.graphics.Color(0xFF607D8B)
+    val archiveColor = androidx.compose.ui.graphics.Color(0xFFFF9800)
+    val apkColor = androidx.compose.ui.graphics.Color(0xFF3DDC84)
+    val default = MaterialTheme.colorScheme.onSurfaceVariant
+
+    if (isDir) return Icons.Filled.Folder to primary
+
+    return when {
+        name.endsWith(".apk", ignoreCase = true) -> Icons.Filled.Android to apkColor
+        name.endsWith(".jpg", ignoreCase = true) ||
+            name.endsWith(".jpeg", ignoreCase = true) ||
+            name.endsWith(".png", ignoreCase = true) ||
+            name.endsWith(".gif", ignoreCase = true) ||
+            name.endsWith(".webp", ignoreCase = true) -> Icons.Filled.Image to imageColor
+        name.endsWith(".mp4", ignoreCase = true) ||
+            name.endsWith(".mkv", ignoreCase = true) ||
+            name.endsWith(".avi", ignoreCase = true) ||
+            name.endsWith(".mov", ignoreCase = true) -> Icons.Filled.Videocam to videoColor
+        name.endsWith(".mp3", ignoreCase = true) ||
+            name.endsWith(".wav", ignoreCase = true) ||
+            name.endsWith(".flac", ignoreCase = true) ||
+            name.endsWith(".aac", ignoreCase = true) -> Icons.Filled.Audiotrack to audioColor
+        name.endsWith(".zip", ignoreCase = true) ||
+            name.endsWith(".rar", ignoreCase = true) ||
+            name.endsWith(".7z", ignoreCase = true) ||
+            name.endsWith(".tar", ignoreCase = true) ||
+            name.endsWith(".gz", ignoreCase = true) -> Icons.Filled.Archive to archiveColor
+        name.endsWith(".txt", ignoreCase = true) ||
+            name.endsWith(".md", ignoreCase = true) ||
+            name.endsWith(".pdf", ignoreCase = true) ||
+            name.endsWith(".doc", ignoreCase = true) ||
+            name.endsWith(".docx", ignoreCase = true) -> Icons.Filled.Description to textColor
+        name.endsWith(".kt", ignoreCase = true) ||
+            name.endsWith(".java", ignoreCase = true) ||
+            name.endsWith(".py", ignoreCase = true) ||
+            name.endsWith(".js", ignoreCase = true) ||
+            name.endsWith(".c", ignoreCase = true) ||
+            name.endsWith(".cpp", ignoreCase = true) ||
+            name.endsWith(".xml", ignoreCase = true) ||
+            name.endsWith(".json", ignoreCase = true) -> Icons.Filled.Code to codeColor
+        else -> Icons.AutoMirrored.Filled.InsertDriveFile to default
+    }
+}
+@Composable
 fun FileItemRow(
     file: Map<String, String>,
     onClick: () -> Unit,
@@ -325,10 +376,11 @@ fun FileItemRow(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val icon = getFileIcon(name, isDir)
             Icon(
-                imageVector = if (isDir) Icons.Filled.Folder else Icons.AutoMirrored.Filled.InsertDriveFile,
+                imageVector = icon.first,
                 contentDescription = null,
-                tint = if (isDir) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = icon.second,
                 modifier = Modifier.size(32.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
