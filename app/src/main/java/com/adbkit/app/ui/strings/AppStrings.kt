@@ -292,6 +292,8 @@ interface AppStrings {
     // Fastboot screen
     val fastbootDeviceConnected: String
     val fastbootInsertDevice: String
+    val fastbootNoDevice: String
+    val fastbootNoPermission: String
     val flashImage: String
     val imageFilePath: String
     val selectFile: String

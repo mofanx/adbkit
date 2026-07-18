@@ -278,6 +278,8 @@ object EnStrings : AppStrings {
     // Fastboot
     override val fastbootDeviceConnected = "Fastboot device connected"
     override val fastbootInsertDevice = "Please insert device"
+    override val fastbootNoDevice = "No Fastboot device found. Connect the target device to the USB port."
+    override val fastbootNoPermission = "Fastboot requires root or USB access permissions. Try running this app with root (su) or grant USB device access in Magisk/KernelSU settings."
     override val flashImage = "Flash Image"
     override val imageFilePath = "Image file path"
     override val selectFile = "Select File"

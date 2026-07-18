@@ -124,7 +124,12 @@ fun FastbootScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = if (uiState.deviceDetected) strings.fastbootDeviceConnected else strings.fastbootInsertDevice,
+                        text = if (uiState.deviceDetected) strings.fastbootDeviceConnected
+                        else when (uiState.permissionWarning) {
+                            "fastboot_no_permission" -> strings.fastbootNoPermission
+                            "fastboot_no_device" -> strings.fastbootNoDevice
+                            else -> strings.fastbootInsertDevice
+                        },
                         color = if (uiState.deviceDetected)
                             MaterialTheme.colorScheme.onPrimaryContainer
                         else MaterialTheme.colorScheme.onErrorContainer

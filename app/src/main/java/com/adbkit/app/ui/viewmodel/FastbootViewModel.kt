@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 
 data class FastbootUiState(
     val deviceDetected: Boolean = false,
+    val hasRootAccess: Boolean = false,
+    val permissionWarning: String = "",
     val imagePath: String = "",
     val selectedPartition: String = "recovery",
     val customCommand: String = "",
@@ -29,8 +31,23 @@ class FastbootViewModel : ViewModel() {
     fun checkDevices() {
         viewModelScope.launch {
             val result = AdbService.fastbootDevices()
+            val rawOutput = result.output + "\n" + result.error
             val hasDevice = result.success && result.output.isNotBlank() && result.output.contains("fastboot")
-            _uiState.update { it.copy(deviceDetected = hasDevice) }
+            val noPermissions = rawOutput.lowercase().contains("no permissions") ||
+                rawOutput.lowercase().contains("permission denied") ||
+                rawOutput.lowercase().contains("insufficient permissions")
+            val root = AdbService.hasRootAccess()
+            _uiState.update {
+                it.copy(
+                    deviceDetected = hasDevice,
+                    hasRootAccess = root,
+                    permissionWarning = when {
+                        noPermissions && !root -> "fastboot_no_permission"
+                        !hasDevice -> "fastboot_no_device"
+                        else -> ""
+                    }
+                )
+            }
             appendOutput(if (hasDevice) "Fastboot device detected" else "No Fastboot device found")
         }
     }

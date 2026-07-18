@@ -278,6 +278,8 @@ object ZhStrings : AppStrings {
     // Fastboot
     override val fastbootDeviceConnected = "Fastboot 设备已连接"
     override val fastbootInsertDevice = "请插入设备"
+    override val fastbootNoDevice = "未发现 Fastboot 设备。请将目标设备连接至本机 USB 端口。"
+    override val fastbootNoPermission = "Fastboot 需要 root 或 USB 设备访问权限。请尝试以 root（su）运行本应用，或在 Magisk/KernelSU 中授予 USB 设备访问权限。"
     override val flashImage = "刷入镜像"
     override val imageFilePath = "镜像文件路径"
     override val selectFile = "选择文件"
