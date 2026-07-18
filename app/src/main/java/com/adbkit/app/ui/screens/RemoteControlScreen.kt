@@ -28,6 +28,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +64,7 @@ private fun ScreenMirrorView(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+    val context = LocalContext.current
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     var dragStart by remember { mutableStateOf(Offset.Zero) }
     var dragEnd by remember { mutableStateOf(Offset.Zero) }
@@ -72,6 +74,7 @@ private fun ScreenMirrorView(
     var navBarExpanded by remember { mutableStateOf(false) }
     var navBarOffset by remember { mutableStateOf<Offset?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showInputDialog by remember { mutableStateOf(false) }
 
     // Start stream when both connected and surface ready
     LaunchedEffect(uiState.isConnected, surfaceReady, currentSurface) {
@@ -104,6 +107,9 @@ private fun ScreenMirrorView(
                         }
                     },
                     actions = {
+                        IconButton(onClick = { showInputDialog = true }) {
+                            Icon(Icons.Filled.Input, contentDescription = strings.inputText)
+                        }
                         IconButton(onClick = { showControls = false }) {
                             Icon(Icons.Filled.Fullscreen, contentDescription = strings.fullscreen)
                         }
@@ -276,6 +282,38 @@ private fun ScreenMirrorView(
                 )
             }
             // "hidden" mode: no nav bar at all
+        }
+
+        // Text input dialog
+        if (showInputDialog) {
+            var text by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showInputDialog = false },
+                title = { Text(strings.inputText) },
+                text = {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        label = { Text(strings.textContent) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.sendText(text); showInputDialog = false }) {
+                        Text(strings.send)
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(onClick = { viewModel.pasteFromClipboard(context); showInputDialog = false }) {
+                            Text("Paste")
+                        }
+                        TextButton(onClick = { showInputDialog = false }) {
+                            Text(strings.close)
+                        }
+                    }
+                }
+            )
         }
     }
 }

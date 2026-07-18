@@ -1,5 +1,8 @@
 package com.adbkit.app.ui.viewmodel
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -177,6 +180,29 @@ class RemoteControlViewModel : ViewModel() {
     fun sendKey(keyCode: Int) {
         viewModelScope.launch {
             AdbService.inputKeyEvent(keyCode)
+        }
+    }
+
+    fun sendText(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            val result = AdbService.inputText(text)
+            _uiState.update {
+                it.copy(
+                    statusMessage = if (result.success) "Text sent" else "Send failed: ${result.error}",
+                    isError = !result.success
+                )
+            }
+        }
+    }
+
+    fun pasteFromClipboard(context: Context) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val text = clipboard?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+        if (text.isNotBlank()) {
+            sendText(text)
+        } else {
+            _uiState.update { it.copy(statusMessage = "Clipboard is empty", isError = true) }
         }
     }
 
