@@ -73,8 +73,14 @@ class DeviceInfoViewModel : ViewModel() {
     fun copyAll() {
         val info = _uiState.value.deviceInfo
         if (info.isEmpty()) return
-        val text = info.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+        val text = buildShareText()
         val clipboard = AdbKitApplication.instance.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("Device Info", text))
+    }
+
+    fun buildShareText(): String {
+        val info = _uiState.value.deviceInfo
+        if (info.isEmpty()) return ""
+        return info.entries.joinToString("\n") { "${it.key}: ${it.value}" }
     }
 }

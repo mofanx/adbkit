@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -12,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
@@ -25,6 +27,7 @@ fun DeviceInfoScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -41,6 +44,18 @@ fun DeviceInfoScreen(
                     }
                     IconButton(onClick = { viewModel.copyAll() }) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = strings.copyAll)
+                    }
+                    IconButton(onClick = {
+                        val text = viewModel.buildShareText()
+                        if (text.isNotBlank()) {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            }
+                            context.startActivity(Intent.createChooser(intent, strings.share))
+                        }
+                    }) {
+                        Icon(Icons.Filled.Share, contentDescription = strings.share)
                     }
                 }
             )

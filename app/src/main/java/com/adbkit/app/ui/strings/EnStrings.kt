@@ -20,6 +20,7 @@ object EnStrings : AppStrings {
     override val search = "Search"
     override val more = "More"
     override val copy = "Copy"
+    override val share = "Share"
     override val execute = "Execute"
     override val connect = "Connect"
     override val disconnect = "Disconnect"

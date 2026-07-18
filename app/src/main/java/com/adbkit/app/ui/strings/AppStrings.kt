@@ -24,6 +24,7 @@ interface AppStrings {
     val search: String
     val more: String
     val copy: String
+    val share: String
     val execute: String
     val connect: String
     val disconnect: String
