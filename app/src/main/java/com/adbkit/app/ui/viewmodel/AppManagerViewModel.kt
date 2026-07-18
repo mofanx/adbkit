@@ -176,12 +176,14 @@ class AppManagerViewModel : ViewModel() {
             val remotePath = "/data/local/tmp/install_temp.apk"
             val pushResult = AdbService.pushFile(localPath, remotePath)
             if (!pushResult.success) {
+                File(localPath).delete()
                 _uiState.update { it.copy(isInstalling = false, statusMessage = "Push failed: ${pushResult.error}") }
                 return@launch
             }
             val installResult = AdbService.installApp(remotePath)
-            // Clean up temp file
+            // Clean up temp files
             AdbService.shell("rm -f $remotePath")
+            File(localPath).delete()
             _uiState.update {
                 it.copy(
                     isInstalling = false,
