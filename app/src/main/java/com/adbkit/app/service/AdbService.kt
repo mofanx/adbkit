@@ -348,6 +348,26 @@ object AdbService {
         return info
     }
 
+    suspend fun getApkPaths(packageName: String): List<String> {
+        val result = shell("pm path ${shellQuote(packageName)}")
+        if (!result.success) return emptyList()
+        return result.output.lines()
+            .filter { it.startsWith("package:") }
+            .map { it.removePrefix("package:").trim() }
+    }
+
+    suspend fun backupApk(packageName: String, destDir: String = "/sdcard/app_backup_adbkit", fileName: String = "${packageName}.apk"): CommandResult {
+        val paths = getApkPaths(packageName)
+        if (paths.isEmpty()) return CommandResult(success = false, output = "", error = "No APK path found for $packageName", exitCode = 1)
+        val mkdirResult = shell("mkdir -p ${shellQuote(destDir)}")
+        if (!mkdirResult.success) return mkdirResult
+        paths.forEachIndexed { index, path ->
+            val outFile = if (paths.size > 1) "$destDir/${packageName}_${index}.apk" else "$destDir/$fileName"
+            shell("cp -f ${shellQuote(path)} ${shellQuote(outFile)}")
+        }
+        return CommandResult(success = true, output = "Backed up to $destDir", error = "", exitCode = 0)
+    }
+
     suspend fun installApp(apkPath: String): CommandResult {
         // Use pm install for device-side paths (after adb push)
         // Use adb install for host-side paths

@@ -192,6 +192,30 @@ class AppManagerViewModel : ViewModel() {
         }
     }
 
+    fun batchBackupFiltered() {
+        viewModelScope.launch {
+            val packages = _uiState.value.filteredPackages
+            if (packages.isEmpty()) {
+                _uiState.update { it.copy(statusMessage = "No apps to backup") }
+                return@launch
+            }
+            _uiState.update { it.copy(isLoading = true, statusMessage = "Backing up ${packages.size} app(s)...") }
+            var successCount = 0
+            var failedCount = 0
+            val destDir = "/sdcard/app_backup_adbkit"
+            packages.forEach { pkg ->
+                val result = AdbService.backupApk(pkg, destDir)
+                if (result.success) successCount++ else failedCount++
+            }
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    statusMessage = "Backup complete: $successCount success, $failedCount failed. Saved to $destDir"
+                )
+            }
+        }
+    }
+
     fun exportAppList(context: Context) {
         viewModelScope.launch {
             _uiState.update { it.copy(statusMessage = "Exporting app list...") }

@@ -93,6 +93,9 @@ fun AppManagerScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.batchBackupFiltered() }) {
+                        Icon(Icons.Filled.Save, contentDescription = strings.appBackupApk)
+                    }
                     IconButton(onClick = { viewModel.exportAppList(context) }) {
                         @Suppress("DEPRECATION")
                         Icon(Icons.Filled.List, contentDescription = strings.exportAppList)
