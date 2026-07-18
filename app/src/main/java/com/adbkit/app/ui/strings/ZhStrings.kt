@@ -65,6 +65,12 @@ object ZhStrings : AppStrings {
     override val fillAllFields = "请填写完整信息"
     override val connectingTo = { addr: String -> "正在连接 $addr..." }
     override val connected = "连接成功"
+    override val connectionRefused = "连接被拒绝。请确认目标设备已开启 USB/无线调试，并允许此主机调试。"
+    override val connectionUnreachable = "设备不可达。请检查 IP 地址，并确认两台设备在同一网络。"
+    override val connectionOffline = "设备处于离线状态。请尝试在目标设备上重启 ADB 或重新授权。"
+    override val connectionAuthFailed = "ADB 认证失败。请重新配对、撤销 USB 调试授权或重新插拔 USB。"
+    override val connectionInvalidIp = "IP 地址或主机名无效。"
+    override val connectionFailed = "无法连接到设备。"
     override val connectFailed = { error: String -> "连接失败: $error" }
     override val pleaseEnterIp = "请输入IP地址"
 

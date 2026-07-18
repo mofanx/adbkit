@@ -65,6 +65,12 @@ object EnStrings : AppStrings {
     override val fillAllFields = "Please fill in all fields"
     override val connectingTo = { addr: String -> "Connecting to $addr..." }
     override val connected = "Connected"
+    override val connectionRefused = "Connection refused. Ensure USB/wireless debugging is enabled and the device has authorized this host."
+    override val connectionUnreachable = "Device unreachable. Check the IP address and that both devices are on the same network."
+    override val connectionOffline = "Device is offline. Try restarting ADB on the device or re-authorizing."
+    override val connectionAuthFailed = "ADB authentication failed. Re-pair, revoke USB debugging authorizations, or reconnect USB."
+    override val connectionInvalidIp = "Invalid IP address or host name."
+    override val connectionFailed = "Failed to connect to the device."
     override val connectFailed = { error: String -> "Connection failed: $error" }
     override val pleaseEnterIp = "Please enter IP address"
 

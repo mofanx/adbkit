@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.service.AdbBinaryManager
+import com.adbkit.app.ui.components.ConnectionErrorMessage
 import com.adbkit.app.ui.components.WelcomePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.HomeViewModel
@@ -282,6 +283,11 @@ fun HomeScreen(
                     else MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+
+            if (uiState.connectionError.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                ConnectionErrorMessage(type = uiState.connectionError)
             }
         }
 

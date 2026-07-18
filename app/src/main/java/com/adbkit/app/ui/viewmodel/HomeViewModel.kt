@@ -24,6 +24,7 @@ data class HomeUiState(
     val selectedDevice: String? = null,
     val isConnecting: Boolean = false,
     val statusMessage: String = "",
+    val connectionError: String = "",
     val isError: Boolean = false,
     val showPairDialog: Boolean = false,
     val showMoreMenu: Boolean = false,
@@ -59,7 +60,7 @@ class HomeViewModel : ViewModel() {
     }
 
     fun updateIpAddress(ip: String) {
-        _uiState.update { it.copy(ipAddress = ip) }
+        _uiState.update { it.copy(ipAddress = ip, connectionError = "") }
     }
 
     fun toggleHistoryDropdown() {
@@ -71,7 +72,7 @@ class HomeViewModel : ViewModel() {
     }
 
     fun selectHistory(address: String) {
-        _uiState.update { it.copy(ipAddress = address, showHistoryDropdown = false) }
+        _uiState.update { it.copy(ipAddress = address, showHistoryDropdown = false, connectionError = "") }
     }
 
     fun removeHistory(address: String) {
@@ -85,7 +86,7 @@ class HomeViewModel : ViewModel() {
             return
         }
         val address = if (ip.contains(":")) ip else "$ip:5555"
-        _uiState.update { it.copy(isConnecting = true, statusMessage = "Connecting...") }
+        _uiState.update { it.copy(isConnecting = true, statusMessage = "Connecting...", connectionError = "") }
         viewModelScope.launch {
             val result = AdbService.connect(address)
             if (result.success && result.output.contains("connected")) {
@@ -96,16 +97,19 @@ class HomeViewModel : ViewModel() {
                     it.copy(
                         isConnecting = false,
                         statusMessage = "Connected",
+                        connectionError = "",
                         isError = false,
                         selectedDevice = address
                     )
                 }
                 loadDashboard()
             } else {
+                val errorType = AdbService.classifyConnectionError(result)
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
-                        statusMessage = result.error.ifEmpty { result.output.ifEmpty { "Connection failed" } },
+                        connectionError = errorType,
+                        statusMessage = "Connection failed",
                         isError = true
                     )
                 }

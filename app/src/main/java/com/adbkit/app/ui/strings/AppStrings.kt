@@ -69,6 +69,12 @@ interface AppStrings {
     val fillAllFields: String
     val connectingTo: (String) -> String
     val connected: String
+    val connectionRefused: String
+    val connectionUnreachable: String
+    val connectionOffline: String
+    val connectionAuthFailed: String
+    val connectionInvalidIp: String
+    val connectionFailed: String
     val connectFailed: (String) -> String
     val pleaseEnterIp: String
 
