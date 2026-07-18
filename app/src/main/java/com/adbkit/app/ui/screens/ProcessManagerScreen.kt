@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -27,6 +28,16 @@ fun ProcessManagerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+
+    // Auto-refresh CPU/memory/process list every 5 seconds while this screen is active
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5000)
+            if (!uiState.isLoading) {
+                viewModel.refresh()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
