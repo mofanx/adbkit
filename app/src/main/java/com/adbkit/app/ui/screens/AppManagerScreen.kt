@@ -4,10 +4,13 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.*
@@ -198,6 +201,8 @@ fun AppManagerScreen(
                 packageName = uiState.selectedPackage,
                 details = uiState.appDetails,
                 permissions = uiState.appPermissions,
+                icon = uiState.appIcon,
+                components = uiState.appComponents,
                 onDismiss = { viewModel.hideDetail() }
             )
         }
@@ -334,6 +339,8 @@ fun AppDetailDialog(
     packageName: String,
     details: Map<String, String>,
     permissions: List<String> = emptyList(),
+    icon: Bitmap? = null,
+    components: Map<String, String> = emptyMap(),
     onDismiss: () -> Unit
 ) {
     val strings = LocalStrings.current
@@ -352,6 +359,33 @@ fun AppDetailDialog(
         title = { Text(packageName, style = MaterialTheme.typography.titleSmall) },
         text = {
             LazyColumn {
+                item {
+                    if (icon != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Image(
+                                bitmap = icon.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp)
+                            )
+                        }
+                    }
+                    if (components.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            ComponentChip(label = strings.activities, count = components["activities"] ?: "0")
+                            ComponentChip(label = strings.services, count = components["services"] ?: "0")
+                            ComponentChip(label = strings.receivers, count = components["receivers"] ?: "0")
+                            ComponentChip(label = strings.providers, count = components["providers"] ?: "0")
+                        }
+                    }
+                }
                 items(details.toList()) { (key, value) ->
                     Row(
                         modifier = Modifier
@@ -401,4 +435,21 @@ fun AppDetailDialog(
             TextButton(onClick = onDismiss) { Text(LocalStrings.current.close) }
         }
     )
+}
+
+@Composable
+fun ComponentChip(label: String, count: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = count,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }

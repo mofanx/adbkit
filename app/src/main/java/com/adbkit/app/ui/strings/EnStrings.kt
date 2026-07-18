@@ -389,6 +389,10 @@ object EnStrings : AppStrings {
     override val installSuccess = "Install successful"
     override val installFailed = "Install failed"
     override val exportAppList = "Export App List"
+    override val activities = "Activities"
+    override val services = "Services"
+    override val receivers = "Receivers"
+    override val providers = "Providers"
 
     // Process management
     override val memoryUsage = "Memory Usage"

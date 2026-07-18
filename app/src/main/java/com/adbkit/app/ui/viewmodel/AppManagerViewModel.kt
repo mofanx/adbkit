@@ -1,6 +1,7 @@
 package com.adbkit.app.ui.viewmodel
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
@@ -25,6 +26,8 @@ data class AppManagerUiState(
     val selectedPackage: String = "",
     val appDetails: Map<String, String> = emptyMap(),
     val appPermissions: List<String> = emptyList(),
+    val appIcon: Bitmap? = null,
+    val appComponents: Map<String, String> = emptyMap(),
     val isInstalling: Boolean = false,
     val requestApkPick: Boolean = false
 ) {
@@ -149,12 +152,23 @@ class AppManagerViewModel : ViewModel() {
             _uiState.update { it.copy(selectedPackage = pkg, showDetailDialog = true) }
             val details = AdbService.getAppDetail(pkg)
             val permissions = AdbService.getAppPermissions(pkg)
-            _uiState.update { it.copy(appDetails = details, appPermissions = permissions) }
+            val icon = AdbService.getAppIcon(pkg)
+            val components = AdbService.getAppComponentCounts(pkg)
+            _uiState.update { it.copy(appDetails = details, appPermissions = permissions, appIcon = icon, appComponents = components) }
         }
     }
 
     fun hideDetail() {
-        _uiState.update { it.copy(showDetailDialog = false, selectedPackage = "", appDetails = emptyMap(), appPermissions = emptyList()) }
+        _uiState.update {
+            it.copy(
+                showDetailDialog = false,
+                selectedPackage = "",
+                appDetails = emptyMap(),
+                appPermissions = emptyList(),
+                appIcon = null,
+                appComponents = emptyMap()
+            )
+        }
     }
 
     fun clearStatus() {

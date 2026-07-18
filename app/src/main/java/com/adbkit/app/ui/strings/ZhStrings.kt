@@ -389,6 +389,10 @@ object ZhStrings : AppStrings {
     override val installSuccess = "安装成功"
     override val installFailed = "安装失败"
     override val exportAppList = "导出应用列表"
+    override val activities = "活动"
+    override val services = "服务"
+    override val receivers = "接收器"
+    override val providers = "内容提供"
 
     // Process management
     override val memoryUsage = "内存占用"

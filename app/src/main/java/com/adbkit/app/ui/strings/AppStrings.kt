@@ -404,6 +404,10 @@ interface AppStrings {
     val installSuccess: String
     val installFailed: String
     val exportAppList: String
+    val activities: String
+    val services: String
+    val receivers: String
+    val providers: String
 
     // Process management
     val memoryUsage: String

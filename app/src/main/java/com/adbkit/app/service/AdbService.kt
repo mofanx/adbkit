@@ -717,6 +717,57 @@ object AdbService {
             .map { it.trim() }
     }
 
+    suspend fun getAppIcon(packageName: String): Bitmap? = withContext(Dispatchers.IO) {
+        val paths = getApkPaths(packageName)
+        if (paths.isEmpty()) return@withContext null
+        val local = java.io.File(AdbKitApplication.instance.cacheDir, "icon_${packageName}.apk")
+        val pull = pullFile(paths.first(), local.absolutePath)
+        if (!pull.success) return@withContext null
+        val pm = AdbKitApplication.instance.packageManager
+        val info = pm.getPackageArchiveInfo(local.absolutePath, 0) ?: return@withContext null
+        val ai = info.applicationInfo ?: return@withContext null
+        try {
+            val drawable = ai.loadIcon(pm)
+            drawableToBitmap(drawable)
+        } catch (_: Exception) { null }
+    }
+
+    private fun drawableToBitmap(drawable: android.graphics.drawable.Drawable): Bitmap? {
+        if (drawable is android.graphics.drawable.BitmapDrawable && drawable.bitmap != null) {
+            return drawable.bitmap
+        }
+        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 1
+        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 1
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
+    suspend fun getAppComponentCounts(packageName: String): Map<String, String> {
+        val result = shell("dumpsys package ${shellQuote(packageName)}")
+        val counts = mutableMapOf("activities" to "0", "services" to "0", "receivers" to "0", "providers" to "0")
+        if (!result.success) return counts
+        val sectionMap = mapOf("Activities" to "activities", "Services" to "services", "Receivers" to "receivers", "Providers" to "providers")
+        val headerRegex = "^  (Activities|Services|Receivers|Providers):.*".toRegex()
+        val entryRegex = "^    [^ ].*".toRegex()
+        var current: String? = null
+        result.output.lines().forEach { line ->
+            val header = headerRegex.find(line)
+            if (header != null) {
+                current = sectionMap[header.groupValues[1]]
+            } else if (current != null) {
+                if (entryRegex.matches(line)) {
+                    counts[current] = (counts[current]!!.toInt() + 1).toString()
+                } else if (!line.startsWith("      ") && line.trim().isNotEmpty() && !line.startsWith("    ")) {
+                    current = null
+                }
+            }
+        }
+        return counts
+    }
+
     suspend fun setSystemProp(prop: String, value: String): CommandResult {
         return shell("setprop ${shellQuote(prop)} ${shellQuote(value)}")
     }
