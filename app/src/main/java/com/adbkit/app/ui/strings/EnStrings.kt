@@ -185,6 +185,8 @@ object EnStrings : AppStrings {
     override val resolution = "Resolution"
     override val noLog = "No logs"
     override val clear = "Clear"
+    override val propName = "Property Name"
+    override val propValue = "Property Value"
 
     // App Manager
     override val appManager = "App Manager"

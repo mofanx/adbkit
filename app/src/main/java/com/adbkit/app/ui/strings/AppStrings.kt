@@ -196,9 +196,11 @@ interface AppStrings {
     val modifyResolution: String
     val resolutionFormat: String
     val resolution: String
-    // Logcat dialog
+    // Logcat / sysprop dialog
     val noLog: String
     val clear: String
+    val propName: String
+    val propValue: String
 
     // App Manager screen
     val appManager: String

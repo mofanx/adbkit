@@ -185,6 +185,8 @@ object ZhStrings : AppStrings {
     override val resolution = "分辨率"
     override val noLog = "无日志"
     override val clear = "清除"
+    override val propName = "属性名"
+    override val propValue = "属性值"
 
     // App Manager
     override val appManager = "应用管理"

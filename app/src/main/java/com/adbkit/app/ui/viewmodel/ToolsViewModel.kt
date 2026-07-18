@@ -251,10 +251,23 @@ class ToolsViewModel : ViewModel() {
             val result = AdbService.shell("getprop")
             _uiState.update {
                 it.copy(
-                    activeDialog = "logcat_view",
+                    activeDialog = "sysprop_view",
                     commandOutput = if (result.success) result.output else "Failed: ${result.error}"
                 )
             }
+        }
+    }
+
+    fun setSystemProp(name: String, value: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "Setting $name...") }
+            val result = AdbService.setSystemProp(name, value)
+            _uiState.update {
+                it.copy(
+                    statusMessage = if (result.success) "Property $name set" else "Set failed: ${result.error}"
+                )
+            }
+            if (result.success) showSystemProps()
         }
     }
 

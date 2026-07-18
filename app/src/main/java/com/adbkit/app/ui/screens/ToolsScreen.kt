@@ -1,6 +1,8 @@
 package com.adbkit.app.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -129,6 +131,12 @@ fun ToolsScreen(
                 onDismiss = { viewModel.dismissDialog() },
                 onRefresh = { viewModel.executeTool("logcat") },
                 onClear = { viewModel.clearLogcat() }
+            )
+            "sysprop_view" -> SysPropDialog(
+                output = uiState.commandOutput,
+                onDismiss = { viewModel.dismissDialog() },
+                onRefresh = { viewModel.executeTool("sysprop") },
+                onSet = { name, value -> viewModel.setSystemProp(name, value) }
             )
         }
 
@@ -473,6 +481,83 @@ fun LogcatViewDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text(LocalStrings.current.close) }
+        }
+    )
+}
+
+@Composable
+fun SysPropDialog(
+    output: String,
+    onDismiss: () -> Unit,
+    onRefresh: () -> Unit,
+    onSet: (String, String) -> Unit
+) {
+    val strings = LocalStrings.current
+    var propName by remember { mutableStateOf("") }
+    var propValue by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(strings.toolSystemProperties)
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    val scrollState = rememberScrollState()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(scrollState)
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = output.ifEmpty { strings.noLog },
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = propName,
+                    onValueChange = { propName = it },
+                    label = { Text(strings.propName) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = propValue,
+                    onValueChange = { propValue = it },
+                    label = { Text(strings.propValue) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    onClick = { if (propName.isNotBlank()) onSet(propName, propValue) },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(strings.set)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(strings.close) }
         }
     )
 }
