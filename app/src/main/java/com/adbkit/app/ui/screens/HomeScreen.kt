@@ -246,6 +246,20 @@ fun HomeScreen(
                 }
             }
 
+            // Dashboard for the selected device
+            if (uiState.connectedDevices.isNotEmpty() && !uiState.isLoadingDashboard) {
+                Spacer(modifier = Modifier.height(16.dp))
+                DashboardCard(
+                    info = uiState.dashboardInfo,
+                    onRefresh = { viewModel.loadDashboard() }
+                )
+            } else if (uiState.isLoadingDashboard) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            }
+
             // Status message
             if (uiState.statusMessage.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -523,4 +537,68 @@ fun ScanDevicesDialog(
             }
         }
     )
+}
+
+@Composable
+fun DashboardCard(
+    info: Map<String, String>,
+    onRefresh: () -> Unit
+) {
+    val strings = LocalStrings.current
+    val items = listOf(
+        strings.diModel to (info["model"] ?: ""),
+        strings.diAndroidVersion to (info["android_version"] ?: ""),
+        strings.diBatteryLevel to (info["battery_level"] ?: ""),
+        strings.diTotalMemory to (info["total_memory"] ?: ""),
+        strings.diAvailableMemory to (info["available_memory"] ?: ""),
+        strings.diTotalStorage to (info["total_storage"] ?: ""),
+        strings.diAvailableStorage to (info["available_storage"] ?: ""),
+        strings.diScreenResolution to (info["screen_resolution"] ?: ""),
+        strings.diIpAddress to (info["ip_address"] ?: "")
+    ).filter { it.second.isNotBlank() }
+
+    if (items.isEmpty()) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = strings.deviceOverview,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = onRefresh) {
+                    Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            items.forEach { (label, value) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
 }

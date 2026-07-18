@@ -78,6 +78,7 @@ object ZhStrings : AppStrings {
     override val networkInfo = "网络信息"
     override val otherInfo = "其他"
     override val moreInfo = "更多信息"
+    override val deviceOverview = "设备概览"
     override val diModel = "型号"
     override val diBrand = "品牌"
     override val diDeviceName = "设备名"

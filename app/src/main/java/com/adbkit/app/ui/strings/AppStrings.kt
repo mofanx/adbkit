@@ -82,6 +82,7 @@ interface AppStrings {
     val networkInfo: String
     val otherInfo: String
     val moreInfo: String
+    val deviceOverview: String
     // Device info keys
     val diModel: String
     val diBrand: String

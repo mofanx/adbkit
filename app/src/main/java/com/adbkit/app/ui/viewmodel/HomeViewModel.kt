@@ -33,7 +33,9 @@ data class HomeUiState(
     val scannedDevices: List<String> = emptyList(),
     val scanStartPort: String = "37000",
     val scanEndPort: String = "44000",
-    val scanTimeoutMs: String = "200"
+    val scanTimeoutMs: String = "200",
+    val dashboardInfo: Map<String, String> = emptyMap(),
+    val isLoadingDashboard: Boolean = false
 )
 
 class HomeViewModel : ViewModel() {
@@ -96,6 +98,7 @@ class HomeViewModel : ViewModel() {
                         selectedDevice = address
                     )
                 }
+                loadDashboard()
             } else {
                 _uiState.update {
                     it.copy(
@@ -116,18 +119,32 @@ class HomeViewModel : ViewModel() {
             }
             refreshDevices()
             _uiState.update { it.copy(statusMessage = "Disconnected $device", isError = false) }
+            loadDashboard()
         }
     }
 
     fun selectDevice(device: String) {
         AdbService.setCurrentDevice(device)
         _uiState.update { it.copy(selectedDevice = device) }
+        loadDashboard()
     }
 
     fun refreshDevices() {
         viewModelScope.launch {
             val devices = AdbService.getConnectedDevices()
             _uiState.update { it.copy(connectedDevices = devices) }
+        }
+    }
+
+    fun loadDashboard() {
+        if (AdbService.getCurrentDevice() == null) {
+            _uiState.update { it.copy(dashboardInfo = emptyMap(), isLoadingDashboard = false) }
+            return
+        }
+        _uiState.update { it.copy(isLoadingDashboard = true) }
+        viewModelScope.launch {
+            val info = AdbService.getDeviceInfo()
+            _uiState.update { it.copy(dashboardInfo = info, isLoadingDashboard = false) }
         }
     }
 

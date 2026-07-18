@@ -78,6 +78,7 @@ object EnStrings : AppStrings {
     override val networkInfo = "Network Info"
     override val otherInfo = "Other"
     override val moreInfo = "More Info"
+    override val deviceOverview = "Device Overview"
     override val diModel = "Model"
     override val diBrand = "Brand"
     override val diDeviceName = "Device Name"
