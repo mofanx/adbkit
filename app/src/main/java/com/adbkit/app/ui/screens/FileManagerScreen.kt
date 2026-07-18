@@ -4,6 +4,8 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,6 +45,7 @@ fun FileManagerScreen(
     val confirmDangerous by settingsRepo.confirmDangerous.collectAsState(initial = true)
 
     var pendingDelete by remember { mutableStateOf<String?>(null) }
+    var pendingBatchDelete by remember { mutableStateOf(false) }
 
     // File picker for upload
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -84,18 +87,41 @@ fun FileManagerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
-                    }
-                    IconButton(onClick = { viewModel.showCreateDirDialog() }) {
-                        Icon(Icons.Filled.CreateNewFolder, contentDescription = strings.newFolder)
-                    }
-                    IconButton(onClick = { viewModel.navigateToHome() }) {
-                        Icon(Icons.Filled.Home, contentDescription = strings.homeDir)
-                    }
-                    // Upload button - triggers file picker
-                    IconButton(onClick = { viewModel.requestUpload() }) {
-                        Icon(Icons.Filled.Upload, contentDescription = strings.upload)
+                    if (uiState.isSelectionMode) {
+                        Text(
+                            text = "${uiState.selectedFiles.size}",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                        IconButton(onClick = { viewModel.selectAll() }) {
+                            Icon(Icons.Filled.SelectAll, contentDescription = "Select all")
+                        }
+                        IconButton(onClick = {
+                            if (confirmDangerous) {
+                                pendingBatchDelete = true
+                            } else {
+                                viewModel.batchDelete()
+                            }
+                        }) {
+                            Icon(Icons.Filled.DeleteSweep, contentDescription = "Batch delete", tint = MaterialTheme.colorScheme.error)
+                        }
+                        IconButton(onClick = { viewModel.exitSelectionMode() }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Cancel selection")
+                        }
+                    } else {
+                        IconButton(onClick = { viewModel.refresh() }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
+                        }
+                        IconButton(onClick = { viewModel.showCreateDirDialog() }) {
+                            Icon(Icons.Filled.CreateNewFolder, contentDescription = strings.newFolder)
+                        }
+                        IconButton(onClick = { viewModel.navigateToHome() }) {
+                            Icon(Icons.Filled.Home, contentDescription = strings.homeDir)
+                        }
+                        // Upload button - triggers file picker
+                        IconButton(onClick = { viewModel.requestUpload() }) {
+                            Icon(Icons.Filled.Upload, contentDescription = strings.upload)
+                        }
                     }
                 }
             )
@@ -222,21 +248,28 @@ fun FileManagerScreen(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     items(uiState.files) { file ->
+                        val path = file["path"] ?: ""
                         FileItemRow(
                             file = file,
+                            isSelectionMode = uiState.isSelectionMode,
+                            isSelected = uiState.selectedFiles.contains(path),
                             onClick = {
-                                if (file["isDirectory"] == "true") {
-                                    viewModel.navigateTo(file["path"] ?: "")
+                                if (uiState.isSelectionMode) {
+                                    viewModel.toggleFileSelection(path)
+                                } else if (file["isDirectory"] == "true") {
+                                    viewModel.navigateTo(path)
                                 }
                             },
+                            onLongClick = { viewModel.enterSelectionMode() },
+                            onSelect = { viewModel.toggleFileSelection(path) },
                             onDelete = {
                                 if (confirmDangerous) {
-                                    pendingDelete = file["path"] ?: ""
+                                    pendingDelete = path
                                 } else {
-                                    viewModel.deleteFile(file["path"] ?: "")
+                                    viewModel.deleteFile(path)
                                 }
                             },
-                            onPull = { viewModel.pullFile(file["path"] ?: "", file["name"] ?: "") }
+                            onPull = { viewModel.pullFile(path, file["name"] ?: "") }
                         )
                     }
 
@@ -269,6 +302,22 @@ fun FileManagerScreen(
                     pendingDelete = null
                 },
                 onDismiss = { pendingDelete = null }
+            )
+        }
+
+        // Batch delete confirmation dialog
+        if (pendingBatchDelete) {
+            ConfirmDialog(
+                title = strings.delete,
+                message = "Delete ${uiState.selectedFiles.size} selected item(s)? This cannot be undone.",
+                confirmText = strings.delete,
+                dismissText = strings.cancel,
+                isDestructive = true,
+                onConfirm = {
+                    viewModel.batchDelete()
+                    pendingBatchDelete = false
+                },
+                onDismiss = { pendingBatchDelete = false }
             )
         }
 
@@ -347,10 +396,16 @@ private fun getFileIcon(name: String, isDir: Boolean): Pair<ImageVector, android
         else -> Icons.AutoMirrored.Filled.InsertDriveFile to default
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileItemRow(
     file: Map<String, String>,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
+    onSelect: () -> Unit = {},
     onDelete: () -> Unit,
     onPull: () -> Unit
 ) {
@@ -363,12 +418,15 @@ fun FileItemRow(
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = 2.dp)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
@@ -376,6 +434,14 @@ fun FileItemRow(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isSelectionMode) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onSelect() },
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+            }
             val icon = getFileIcon(name, isDir)
             Icon(
                 imageVector = icon.first,

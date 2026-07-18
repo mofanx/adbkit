@@ -19,7 +19,9 @@ data class FileManagerUiState(
     val statusMessage: String = "",
     val isTransferring: Boolean = false,
     val requestFilePick: Boolean = false,
-    val hasRootAccess: Boolean = false
+    val hasRootAccess: Boolean = false,
+    val selectedFiles: Set<String> = emptySet(),
+    val isSelectionMode: Boolean = false
 )
 
 class FileManagerViewModel : ViewModel() {
@@ -45,7 +47,7 @@ class FileManagerViewModel : ViewModel() {
                     compareByDescending<Map<String, String>> { it["isDirectory"] == "true" }
                         .thenBy { it["name"]?.lowercase() }
                 )
-                _uiState.update { it.copy(files = sorted, isLoading = false, hasRootAccess = root) }
+                _uiState.update { it.copy(files = sorted, isLoading = false, hasRootAccess = root, selectedFiles = emptySet(), isSelectionMode = false) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
             }
@@ -80,6 +82,46 @@ class FileManagerViewModel : ViewModel() {
             } else {
                 _uiState.update { it.copy(error = "Delete failed: ${result.error}") }
             }
+        }
+    }
+
+    fun toggleFileSelection(path: String) {
+        _uiState.update { state ->
+            val current = state.selectedFiles
+            val newSet = if (current.contains(path)) current - path else current + path
+            state.copy(selectedFiles = newSet, isSelectionMode = true)
+        }
+    }
+
+    fun enterSelectionMode() {
+        _uiState.update { it.copy(isSelectionMode = true) }
+    }
+
+    fun exitSelectionMode() {
+        _uiState.update { it.copy(isSelectionMode = false, selectedFiles = emptySet()) }
+    }
+
+    fun selectAll() {
+        _uiState.update { state ->
+            val all = state.files.mapNotNull { it["path"] }.toSet()
+            state.copy(selectedFiles = all, isSelectionMode = true)
+        }
+    }
+
+    fun batchDelete() {
+        val paths = _uiState.value.selectedFiles.toList()
+        if (paths.isEmpty()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val results = paths.map { AdbService.deleteFile(it) }
+            val failed = results.filterNot { it.success }
+            _uiState.update { it.copy(isLoading = false) }
+            if (failed.isEmpty()) {
+                _uiState.update { it.copy(statusMessage = "Deleted ${paths.size} item(s)") }
+            } else {
+                _uiState.update { it.copy(error = "Batch delete failed for ${failed.size} item(s): ${failed.first().error}") }
+            }
+            loadFiles()
         }
     }
 
