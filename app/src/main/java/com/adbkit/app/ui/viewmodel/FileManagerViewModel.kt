@@ -18,7 +18,8 @@ data class FileManagerUiState(
     val showCreateDirDialog: Boolean = false,
     val statusMessage: String = "",
     val isTransferring: Boolean = false,
-    val requestFilePick: Boolean = false
+    val requestFilePick: Boolean = false,
+    val hasRootAccess: Boolean = false
 )
 
 class FileManagerViewModel : ViewModel() {
@@ -37,13 +38,14 @@ class FileManagerViewModel : ViewModel() {
         _uiState.update { it.copy(isLoading = true, error = "") }
         viewModelScope.launch {
             try {
+                val root = AdbService.hasRootAccess()
                 val files = AdbService.listFiles(_uiState.value.currentPath)
                 // Sort: directories first, then by name
                 val sorted = files.sortedWith(
                     compareByDescending<Map<String, String>> { it["isDirectory"] == "true" }
                         .thenBy { it["name"]?.lowercase() }
                 )
-                _uiState.update { it.copy(files = sorted, isLoading = false) }
+                _uiState.update { it.copy(files = sorted, isLoading = false, hasRootAccess = root) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
             }
@@ -83,15 +85,16 @@ class FileManagerViewModel : ViewModel() {
 
     fun pullFile(remotePath: String, fileName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isTransferring = true, statusMessage = "Downloading...") }
+            _uiState.update { it.copy(isTransferring = true, statusMessage = "Downloading $fileName...") }
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             downloadDir.mkdirs()
             val localPath = "${downloadDir.absolutePath}/$fileName"
             val result = AdbService.pullFile(remotePath, localPath)
+            val size = formatFileSize(java.io.File(localPath).length())
             _uiState.update {
                 it.copy(
                     isTransferring = false,
-                    statusMessage = if (result.success) "Downloaded to $localPath" else "Download failed: ${result.error}"
+                    statusMessage = if (result.success) "Downloaded $fileName ($size) to $localPath" else "Download failed: ${result.error}"
                 )
             }
         }
@@ -99,16 +102,21 @@ class FileManagerViewModel : ViewModel() {
 
     fun pushFile(localPath: String, fileName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isTransferring = true, statusMessage = "Uploading...") }
+            val size = formatFileSize(java.io.File(localPath).length())
+            _uiState.update { it.copy(isTransferring = true, statusMessage = "Uploading $fileName ($size)...") }
             val remotePath = "${_uiState.value.currentPath}/$fileName"
             val result = AdbService.pushFile(localPath, remotePath)
             _uiState.update {
                 it.copy(
                     isTransferring = false,
-                    statusMessage = if (result.success) "Uploaded $fileName" else "Upload failed: ${result.error}"
+                    statusMessage = if (result.success) "Uploaded $fileName ($size)" else "Upload failed: ${result.error}"
                 )
             }
-            if (result.success) loadFiles()
+            if (result.success) {
+                loadFiles()
+            } else {
+                _uiState.update { it.copy(error = "Upload failed: ${result.error}") }
+            }
         }
     }
 
@@ -140,5 +148,13 @@ class FileManagerViewModel : ViewModel() {
                 _uiState.update { it.copy(error = "Create failed: ${result.error}") }
             }
         }
+    }
+
+    private fun formatFileSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+        val idx = digitGroups.coerceIn(0, units.size - 1)
+        return String.format("%.1f %s", bytes / Math.pow(1024.0, idx.toDouble()), units[idx])
     }
 }

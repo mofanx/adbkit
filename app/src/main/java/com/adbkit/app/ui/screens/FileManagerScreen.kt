@@ -21,6 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.SettingsRepository
+import com.adbkit.app.ui.components.ConfirmDialog
+import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FileManagerViewModel
 import java.io.File
@@ -34,6 +38,10 @@ fun FileManagerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
     val context = LocalContext.current
+    val settingsRepo = remember { SettingsRepository(AdbKitApplication.instance) }
+    val confirmDangerous by settingsRepo.confirmDangerous.collectAsState(initial = true)
+
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
 
     // File picker for upload
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -147,6 +155,28 @@ fun FileManagerScreen(
                 }
             }
 
+            // Root warning for protected directories
+            val isProtectedPath = listOf("/", "/data", "/system", "/vendor", "/product", "/sbin").any { uiState.currentPath == it || uiState.currentPath.startsWith("$it/") }
+            if (isProtectedPath && !uiState.hasRootAccess) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    tonalElevation = 1.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = strings.rootRequiredMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
             // Transfer status bar
             if (uiState.isTransferring || uiState.statusMessage.isNotEmpty()) {
                 Surface(
@@ -181,17 +211,10 @@ fun FileManagerScreen(
                     CircularProgressIndicator()
                 }
             } else if (uiState.error.isNotEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.ErrorOutline, null, modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(uiState.error, color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                EmptyDevicePlaceholder(
+                    onRetry = { viewModel.refresh() },
+                    message = uiState.error
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -205,7 +228,13 @@ fun FileManagerScreen(
                                     viewModel.navigateTo(file["path"] ?: "")
                                 }
                             },
-                            onDelete = { viewModel.deleteFile(file["path"] ?: "") },
+                            onDelete = {
+                                if (confirmDangerous) {
+                                    pendingDelete = file["path"] ?: ""
+                                } else {
+                                    viewModel.deleteFile(file["path"] ?: "")
+                                }
+                            },
                             onPull = { viewModel.pullFile(file["path"] ?: "", file["name"] ?: "") }
                         )
                     }
@@ -224,6 +253,22 @@ fun FileManagerScreen(
                     }
                 }
             }
+        }
+
+        // Delete confirmation dialog
+        if (pendingDelete != null) {
+            ConfirmDialog(
+                title = strings.delete,
+                message = "Delete ${pendingDelete?.substringAfterLast('/')}? This cannot be undone.",
+                confirmText = strings.delete,
+                dismissText = strings.cancel,
+                isDestructive = true,
+                onConfirm = {
+                    pendingDelete?.let { viewModel.deleteFile(it) }
+                    pendingDelete = null
+                },
+                onDismiss = { pendingDelete = null }
+            )
         }
 
         // Create directory dialog

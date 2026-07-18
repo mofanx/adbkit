@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.adbkit.app.AdbKitApplication
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +38,11 @@ object AdbService {
 
     fun getCurrentDevice(): String? = _currentDevice.value
 
+    suspend fun hasRootAccess(): Boolean {
+        val result = shell("su -c 'id -u' 2>/dev/null")
+        return result.success && result.output.trim() == "0"
+    }
+
     /**
      * Get HOME directory for ADB server.
      * ADB needs $HOME/.android for auth keys. The default /data is not writable.
@@ -45,12 +51,21 @@ object AdbService {
         return AdbKitApplication.instance.filesDir.absolutePath
     }
 
+    /**
+     * Escape an argument for the device shell to avoid injection or quoting errors.
+     */
+    private fun shellQuote(s: String): String {
+        return "'${s.replace("'", "'\\''")}'"
+    }
+
     suspend fun executeCommand(command: String): CommandResult = withContext(Dispatchers.IO) {
+        var process: Process? = null
         try {
             val pb = ProcessBuilder("sh", "-c", command)
             pb.environment()["HOME"] = getAdbHome()
             pb.environment()["TMPDIR"] = AdbKitApplication.instance.cacheDir.absolutePath
-            val process = pb.start()
+            process = pb.start()
+            coroutineContext[Job]?.invokeOnCompletion { process?.destroyForcibly() }
             val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText()
             val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText()
             val exitCode = process.waitFor()
@@ -67,6 +82,37 @@ object AdbService {
                 error = e.message ?: "Unknown error",
                 exitCode = -1
             )
+        } finally {
+            process?.destroyForcibly()
+        }
+    }
+
+    suspend fun executeCommand(parts: List<String>): CommandResult = withContext(Dispatchers.IO) {
+        var process: Process? = null
+        try {
+            val pb = ProcessBuilder(parts)
+            pb.environment()["HOME"] = getAdbHome()
+            pb.environment()["TMPDIR"] = AdbKitApplication.instance.cacheDir.absolutePath
+            process = pb.start()
+            coroutineContext[Job]?.invokeOnCompletion { process?.destroyForcibly() }
+            val stdout = BufferedReader(InputStreamReader(process.inputStream)).readText()
+            val stderr = BufferedReader(InputStreamReader(process.errorStream)).readText()
+            val exitCode = process.waitFor()
+            CommandResult(
+                success = exitCode == 0,
+                output = stdout.trim(),
+                error = stderr.trim(),
+                exitCode = exitCode
+            )
+        } catch (e: Exception) {
+            CommandResult(
+                success = false,
+                output = "",
+                error = e.message ?: "Unknown error",
+                exitCode = -1
+            )
+        } finally {
+            process?.destroyForcibly()
         }
     }
 
@@ -124,7 +170,7 @@ object AdbService {
     }
 
     suspend fun getDeviceProp(prop: String): String {
-        val result = shell("getprop $prop")
+        val result = shell("getprop ${shellQuote(prop)}")
         return if (result.success) result.output.trim() else ""
     }
 
@@ -217,7 +263,8 @@ object AdbService {
     }
 
     suspend fun listFiles(path: String): List<Map<String, String>> {
-        val result = shell("ls -la '$path'")
+        val q = shellQuote(path)
+        val result = shell("ls -la $q")
         if (!result.success) return emptyList()
         return result.output.lines()
             .filter { it.isNotBlank() && !it.startsWith("total") }
@@ -241,19 +288,19 @@ object AdbService {
     }
 
     suspend fun pullFile(remotePath: String, localPath: String): CommandResult {
-        return adb("pull", "'$remotePath'", "'$localPath'")
+        return adb("pull", shellQuote(remotePath), shellQuote(localPath))
     }
 
     suspend fun pushFile(localPath: String, remotePath: String): CommandResult {
-        return adb("push", "'$localPath'", "'$remotePath'")
+        return adb("push", shellQuote(localPath), shellQuote(remotePath))
     }
 
     suspend fun deleteFile(path: String): CommandResult {
-        return shell("rm -rf '$path'")
+        return shell("rm -rf ${shellQuote(path)}")
     }
 
     suspend fun createDirectory(path: String): CommandResult {
-        return shell("mkdir -p '$path'")
+        return shell("mkdir -p ${shellQuote(path)}")
     }
 
     suspend fun getInstalledPackages(systemApps: Boolean = false): List<String> {
@@ -268,7 +315,7 @@ object AdbService {
 
     suspend fun getAppDetail(packageName: String): Map<String, String> {
         val info = mutableMapOf<String, String>()
-        val dump = shell("dumpsys package $packageName")
+        val dump = shell("dumpsys package ${shellQuote(packageName)}")
         if (dump.success) {
             dump.output.lines().forEach { line ->
                 val trimmed = line.trim()
@@ -291,34 +338,34 @@ object AdbService {
         // Use pm install for device-side paths (after adb push)
         // Use adb install for host-side paths
         return if (apkPath.startsWith("/")) {
-            shell("pm install -r '$apkPath'")
+            shell("pm install -r ${shellQuote(apkPath)}")
         } else {
-            adb("install", "-r", apkPath)
+            adb("install", "-r", shellQuote(apkPath))
         }
     }
 
     suspend fun uninstallApp(packageName: String, keepData: Boolean = false): CommandResult {
         return if (keepData) {
-            adb("uninstall", "-k", packageName)
+            adb("uninstall", "-k", shellQuote(packageName))
         } else {
-            adb("uninstall", packageName)
+            adb("uninstall", shellQuote(packageName))
         }
     }
 
     suspend fun forceStopApp(packageName: String): CommandResult {
-        return shell("am force-stop $packageName")
+        return shell("am force-stop ${shellQuote(packageName)}")
     }
 
     suspend fun clearAppData(packageName: String): CommandResult {
-        return shell("pm clear $packageName")
+        return shell("pm clear ${shellQuote(packageName)}")
     }
 
     suspend fun disableApp(packageName: String): CommandResult {
-        return shell("pm disable-user --user 0 $packageName")
+        return shell("pm disable-user --user 0 ${shellQuote(packageName)}")
     }
 
     suspend fun enableApp(packageName: String): CommandResult {
-        return shell("pm enable $packageName")
+        return shell("pm enable ${shellQuote(packageName)}")
     }
 
     suspend fun getProcessList(): List<Map<String, String>> {
@@ -342,7 +389,7 @@ object AdbService {
     }
 
     suspend fun killProcess(pid: String): CommandResult {
-        return shell("kill -9 $pid")
+        return shell("kill -9 ${shellQuote(pid)}")
     }
 
     suspend fun getRunningApps(): List<Map<String, String>> {
@@ -388,16 +435,16 @@ object AdbService {
 
     suspend fun takeScreenshot(savePath: String): CommandResult {
         val remotePath = "/sdcard/screenshot_temp.png"
-        val cap = shell("screencap -p $remotePath")
+        val cap = shell("screencap -p ${shellQuote(remotePath)}")
         if (!cap.success) return cap
-        val pull = adb("pull", remotePath, "'$savePath'")
-        shell("rm $remotePath")
+        val pull = adb("pull", shellQuote(remotePath), shellQuote(savePath))
+        shell("rm ${shellQuote(remotePath)}")
         return pull
     }
 
     suspend fun startScreenRecord(savePath: String, timeLimit: Int = 180): CommandResult {
         val remotePath = "/sdcard/screenrecord_temp.mp4"
-        return shell("screenrecord --time-limit $timeLimit $remotePath")
+        return shell("screenrecord --time-limit ${shellQuote(timeLimit.toString())} ${shellQuote(remotePath)}")
     }
 
     suspend fun reboot(mode: String = ""): CommandResult {
@@ -409,7 +456,7 @@ object AdbService {
     }
 
     suspend fun fastbootCommand(vararg args: String): CommandResult {
-        val cmd = "$fastbootPath ${args.joinToString(" ")}"
+        val cmd = "$fastbootPath ${args.joinToString(" ") { shellQuote(it) }}"
         return executeCommand(cmd)
     }
 
@@ -422,7 +469,7 @@ object AdbService {
     }
 
     suspend fun inputText(text: String): CommandResult {
-        return shell("input text '${text.replace("'", "\\'")}'")
+        return shell("input text ${shellQuote(text)}")
     }
 
     suspend fun inputKeyEvent(keyCode: Int): CommandResult {
@@ -464,18 +511,18 @@ object AdbService {
     }
 
     suspend fun openUrl(url: String): CommandResult {
-        return shell("am start -a android.intent.action.VIEW -d '$url'")
+        return shell("am start -a android.intent.action.VIEW -d ${shellQuote(url)}")
     }
 
     suspend fun launchApp(packageName: String): CommandResult {
-        return shell("monkey -p $packageName -c android.intent.category.LAUNCHER 1")
+        return shell("monkey -p ${shellQuote(packageName)} -c android.intent.category.LAUNCHER 1")
     }
 
     suspend fun getLogcat(lines: Int = 100, filter: String = ""): CommandResult {
         val cmd = if (filter.isNotEmpty()) {
-            "logcat -d -t $lines | grep -i '$filter'"
+            "logcat -d -t ${shellQuote(lines.toString())} | grep -i ${shellQuote(filter)}"
         } else {
-            "logcat -d -t $lines"
+            "logcat -d -t ${shellQuote(lines.toString())}"
         }
         return shell(cmd)
     }
@@ -485,22 +532,22 @@ object AdbService {
     }
 
     suspend fun backupApp(packageName: String, savePath: String): CommandResult {
-        val apkPath = shell("pm path $packageName")
+        val apkPath = shell("pm path ${shellQuote(packageName)}")
         if (!apkPath.success) return apkPath
         val path = apkPath.output.replace("package:", "").trim()
-        return adb("pull", path, "'$savePath'")
+        return adb("pull", shellQuote(path), shellQuote(savePath))
     }
 
     suspend fun grantPermission(packageName: String, permission: String): CommandResult {
-        return shell("pm grant $packageName $permission")
+        return shell("pm grant ${shellQuote(packageName)} ${shellQuote(permission)}")
     }
 
     suspend fun revokePermission(packageName: String, permission: String): CommandResult {
-        return shell("pm revoke $packageName $permission")
+        return shell("pm revoke ${shellQuote(packageName)} ${shellQuote(permission)}")
     }
 
     suspend fun getAppPermissions(packageName: String): List<String> {
-        val result = shell("dumpsys package $packageName | grep permission")
+        val result = shell("dumpsys package ${shellQuote(packageName)} | grep permission")
         if (!result.success) return emptyList()
         return result.output.lines()
             .filter { it.contains("android.permission.") }
@@ -508,7 +555,7 @@ object AdbService {
     }
 
     suspend fun setSystemProp(prop: String, value: String): CommandResult {
-        return shell("setprop $prop $value")
+        return shell("setprop ${shellQuote(prop)} ${shellQuote(value)}")
     }
 
     suspend fun dumpActivity(): CommandResult {

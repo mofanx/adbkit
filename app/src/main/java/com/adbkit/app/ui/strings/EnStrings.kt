@@ -222,6 +222,8 @@ object EnStrings : AppStrings {
     override val folderName = "Folder Name"
     override val create = "Create"
     override val downloadToLocal = "Download to local"
+    override val rootRequired = "Root Required"
+    override val rootRequiredMessage = "The current directory may require root access. Please make sure the device is rooted and run 'su' in the ADB shell."
 
     // Process Manager
     override val processManager = "Process Manager"

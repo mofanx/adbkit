@@ -222,6 +222,8 @@ object ZhStrings : AppStrings {
     override val folderName = "文件夹名称"
     override val create = "创建"
     override val downloadToLocal = "下载到本地"
+    override val rootRequired = "需要 Root 权限"
+    override val rootRequiredMessage = "当前目录可能需要 root 权限，请确保设备已 root 并在 ADB shell 中运行 su。"
 
     // Process Manager
     override val processManager = "进程管理"

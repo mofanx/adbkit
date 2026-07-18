@@ -23,6 +23,7 @@ class SettingsRepository(private val context: Context) {
         val SAVE_HISTORY = booleanPreferencesKey("save_history")
         val LAST_DEVICE_IP = stringPreferencesKey("last_device_ip")
         val CONNECTION_HISTORY = stringPreferencesKey("connection_history")
+        val COMMAND_HISTORY = stringPreferencesKey("command_history")
         val LANGUAGE = stringPreferencesKey("language")
         val DEVICE_CLICK_TARGET = stringPreferencesKey("device_click_target")
     }
@@ -43,6 +44,10 @@ class SettingsRepository(private val context: Context) {
     }
     val language: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "zh" }
     val deviceClickTarget: Flow<String> = context.dataStore.data.map { it[DEVICE_CLICK_TARGET] ?: "device_info" }
+    val commandHistory: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[COMMAND_HISTORY] ?: ""
+        if (raw.isBlank()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
+    }
 
     suspend fun setAdbPath(path: String) {
         context.dataStore.edit { it[ADB_PATH] = path }
@@ -109,5 +114,28 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setDeviceClickTarget(target: String) {
         context.dataStore.edit { it[DEVICE_CLICK_TARGET] = target }
+    }
+
+    suspend fun setCommandHistory(history: List<String>) {
+        context.dataStore.edit { prefs ->
+            val trimmed = history.takeLast(50).filter { it.isNotBlank() }
+            prefs[COMMAND_HISTORY] = trimmed.joinToString("\n")
+        }
+    }
+
+    suspend fun addCommandHistory(command: String) {
+        if (command.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val raw = prefs[COMMAND_HISTORY] ?: ""
+            val list = if (raw.isBlank()) mutableListOf() else raw.split("\n").filter { it.isNotBlank() }.toMutableList()
+            list.remove(command)
+            list.add(command)
+            if (list.size > 50) list.subList(0, list.size - 50).clear()
+            prefs[COMMAND_HISTORY] = list.joinToString("\n")
+        }
+    }
+
+    suspend fun clearCommandHistory() {
+        context.dataStore.edit { it.remove(COMMAND_HISTORY) }
     }
 }

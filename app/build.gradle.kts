@@ -115,12 +115,15 @@ tasks.register("dexScreenServer") {
 
     doLast {
         val sdk = android.sdkDirectory
-        // Find the latest build-tools version
+        // Find a build-tools directory that contains d8
         val buildToolsDir = file("$sdk/build-tools")
-        val latestBt = buildToolsDir.listFiles()
+        val btDirs = buildToolsDir.listFiles()
             ?.filter { it.isDirectory }
-            ?.maxByOrNull { it.name }
-            ?: error("No build-tools found in $buildToolsDir")
+            ?.filter { file("${it.absolutePath}/d8").exists() }
+            ?.sortedByDescending { it.name }
+            ?: emptyList()
+        val latestBt = btDirs.firstOrNull()
+            ?: error("No build-tools with d8 found in $buildToolsDir")
         val d8 = file("${latestBt.absolutePath}/d8")
         require(d8.exists()) { "d8 not found at $d8" }
 

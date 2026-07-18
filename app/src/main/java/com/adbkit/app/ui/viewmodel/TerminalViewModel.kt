@@ -2,7 +2,11 @@ package com.adbkit.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.service.AdbService
+import com.adbkit.app.service.CommandResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +26,22 @@ data class TerminalUiState(
 class TerminalViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(TerminalUiState(currentDevice = AdbService.getCurrentDevice()))
     val uiState: StateFlow<TerminalUiState> = _uiState.asStateFlow()
+    private val repo = SettingsRepository(AdbKitApplication.instance)
+    private var saveHistoryEnabled = true
+    private var currentCommandJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            repo.commandHistory.collect { history ->
+                _uiState.update { it.copy(commandHistory = history) }
+            }
+        }
+        viewModelScope.launch {
+            repo.saveHistory.collect { saveHistory ->
+                saveHistoryEnabled = saveHistory
+            }
+        }
+    }
 
     fun setCommand(cmd: String) {
         _uiState.update { it.copy(currentCommand = cmd, showHistory = false) }
@@ -57,11 +77,19 @@ class TerminalViewModel : ViewModel() {
             )
         }
 
-        viewModelScope.launch {
-            val result = if (_uiState.value.isShellMode) {
-                AdbService.shell(cmd)
-            } else {
-                AdbService.adb(cmd)
+        currentCommandJob?.cancel()
+        currentCommandJob = viewModelScope.launch {
+            if (saveHistoryEnabled) {
+                repo.addCommandHistory(cmd)
+            }
+            val result = try {
+                if (_uiState.value.isShellMode) {
+                    AdbService.shell(cmd)
+                } else {
+                    AdbService.adb(cmd)
+                }
+            } catch (e: Exception) {
+                CommandResult(false, "", e.message ?: "Cancelled", -1)
             }
 
             val outputLines = mutableListOf<String>()
@@ -74,6 +102,9 @@ class TerminalViewModel : ViewModel() {
             if (outputLines.isEmpty()) {
                 outputLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
             }
+            if (!result.success && result.exitCode == -1 && result.error.contains("Cancelled")) {
+                outputLines.add("(CANCELLED)")
+            }
 
             _uiState.update {
                 it.copy(
@@ -82,6 +113,11 @@ class TerminalViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    fun cancelCommand() {
+        currentCommandJob?.cancel()
+        currentCommandJob = null
     }
 
     fun executeQuickCommand(cmd: String) {

@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.ProcessManagerViewModel
 
@@ -160,19 +161,10 @@ fun ProcessManagerScreen(
                     CircularProgressIndicator()
                 }
             } else if (uiState.error.isNotEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.ErrorOutline, null, modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(uiState.error, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.refresh() }) { Text(strings.retry) }
-                    }
-                }
+                EmptyDevicePlaceholder(
+                    onRetry = { viewModel.refresh() },
+                    message = uiState.error
+                )
             } else if (uiState.showAppsOnly) {
                 // Running apps view
                 val apps = uiState.filteredApps

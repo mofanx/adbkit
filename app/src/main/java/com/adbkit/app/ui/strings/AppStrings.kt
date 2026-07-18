@@ -236,6 +236,8 @@ interface AppStrings {
     val folderName: String
     val create: String
     val downloadToLocal: String
+    val rootRequired: String
+    val rootRequiredMessage: String
 
     // Process Manager screen
     val processManager: String

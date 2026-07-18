@@ -120,8 +120,13 @@ class FastbootViewModel : ViewModel() {
             appendOutput("$ $cmd")
             _uiState.update { it.copy(customCommand = "", isExecuting = true) }
             val fbPath = AdbService.getFastbootPath()
-            val fullCmd = if (cmd.startsWith("fastboot")) cmd.replaceFirst("fastboot", fbPath) else "$fbPath $cmd"
-            val result = AdbService.executeCommand(fullCmd)
+            val args = cmd.split("\\s+".toRegex()).filter { it.isNotBlank() }.toMutableList()
+            if (args.firstOrNull()?.equals("fastboot", ignoreCase = true) == true) {
+                args[0] = fbPath
+            } else {
+                args.add(0, fbPath)
+            }
+            val result = AdbService.executeCommand(args)
             appendOutput(result.output)
             if (result.error.isNotEmpty()) appendOutput(result.error)
             _uiState.update { it.copy(isExecuting = false) }

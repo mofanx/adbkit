@@ -1,5 +1,9 @@
 package com.adbkit.app.ui.screens
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,13 +16,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.SettingsRepository
+import com.adbkit.app.ui.components.ConfirmDialog
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FastbootViewModel
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +37,42 @@ fun FastbootScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+    val context = LocalContext.current
+    val settingsRepo = remember { SettingsRepository(AdbKitApplication.instance) }
+    val confirmDangerous by settingsRepo.confirmDangerous.collectAsState(initial = true)
+
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingTitle by remember { mutableStateOf("") }
+    var pendingMessage by remember { mutableStateOf("") }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val cursor = context.contentResolver.query(it, null, null, null, null)
+            val fileName = cursor?.use { c ->
+                if (c.moveToFirst()) {
+                    val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) c.getString(idx) else null
+                } else null
+            } ?: "image_${System.currentTimeMillis()}"
+            val cacheFile = File(context.cacheDir, fileName)
+            context.contentResolver.openInputStream(it)?.use { input ->
+                cacheFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            viewModel.setImagePath(cacheFile.absolutePath)
+        }
+    }
+
+    fun runDangerous(title: String, message: String, action: () -> Unit) {
+        if (confirmDangerous) {
+            pendingTitle = title
+            pendingMessage = message
+            pendingAction = action
+        } else {
+            action()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -108,7 +153,7 @@ fun FastbootScreen(
                         label = { Text(strings.imageFilePath) },
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
-                            IconButton(onClick = { /* File picker */ }) {
+                            IconButton(onClick = { imagePickerLauncher.launch("*/*") }) {
                                 Icon(Icons.Filled.Folder, strings.selectFile,
                                     tint = MaterialTheme.colorScheme.primary)
                             }
@@ -149,7 +194,13 @@ fun FastbootScreen(
                         }
 
                         Button(
-                            onClick = { viewModel.flashImage() },
+                            onClick = {
+                                runDangerous(
+                                    strings.flashImage,
+                                    "Flash ${uiState.selectedPartition} with ${uiState.imagePath.substringAfterLast('/')}? This may brick the device.",
+                                    { viewModel.flashImage() }
+                                )
+                            },
                             enabled = uiState.imagePath.isNotBlank()
                         ) {
                             Text(strings.flash)
@@ -205,14 +256,14 @@ fun FastbootScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { viewModel.unlockBootloader() },
+                            onClick = { runDangerous(strings.unlockBl, "Unlocking the bootloader will erase all data. Continue?", { viewModel.unlockBootloader() }) },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
                             )
                         ) { Text(strings.unlockBl) }
                         OutlinedButton(
-                            onClick = { viewModel.lockBootloader() },
+                            onClick = { runDangerous(strings.lockBl, "Locking the bootloader may prevent future modifications. Continue?", { viewModel.lockBootloader() }) },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
@@ -225,7 +276,7 @@ fun FastbootScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { viewModel.erasePartition() },
+                            onClick = { runDangerous(strings.erasePartition, "Erase ${uiState.selectedPartition}? All data on that partition will be lost.", { viewModel.erasePartition() }) },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
@@ -313,6 +364,22 @@ fun FastbootScreen(
                         )
                     }
                 }
+            }
+
+            // Dangerous action confirmation
+            if (pendingAction != null) {
+                ConfirmDialog(
+                    title = pendingTitle,
+                    message = pendingMessage,
+                    confirmText = strings.confirm,
+                    dismissText = strings.cancel,
+                    isDestructive = true,
+                    onConfirm = {
+                        pendingAction?.invoke()
+                        pendingAction = null
+                    },
+                    onDismiss = { pendingAction = null }
+                )
             }
         }
     }

@@ -193,17 +193,15 @@ fun TerminalScreen(
                     IconButton(onClick = { viewModel.toggleHistory() }) {
                         Icon(Icons.Filled.History, contentDescription = strings.history)
                     }
-                    FilledIconButton(
-                        onClick = { viewModel.executeCommand() },
-                        enabled = uiState.currentCommand.isNotBlank() && !uiState.isExecuting
-                    ) {
-                        if (uiState.isExecuting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
+                    if (uiState.isExecuting) {
+                        IconButton(onClick = { viewModel.cancelCommand() }) {
+                            Icon(Icons.Filled.Close, contentDescription = strings.cancel)
+                        }
+                    } else {
+                        FilledIconButton(
+                            onClick = { viewModel.executeCommand() },
+                            enabled = uiState.currentCommand.isNotBlank()
+                        ) {
                             Icon(Icons.AutoMirrored.Filled.Send, contentDescription = strings.execute)
                         }
                     }

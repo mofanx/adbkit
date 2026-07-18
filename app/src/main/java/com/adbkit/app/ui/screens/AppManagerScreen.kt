@@ -21,6 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.SettingsRepository
+import com.adbkit.app.ui.components.ConfirmDialog
+import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.AppManagerViewModel
 import java.io.File
@@ -34,6 +38,22 @@ fun AppManagerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
     val context = LocalContext.current
+    val settingsRepo = remember { SettingsRepository(AdbKitApplication.instance) }
+    val confirmDangerous by settingsRepo.confirmDangerous.collectAsState(initial = true)
+
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingTitle by remember { mutableStateOf("") }
+    var pendingMessage by remember { mutableStateOf("") }
+
+    fun runDangerous(title: String, message: String, action: () -> Unit) {
+        if (confirmDangerous) {
+            pendingTitle = title
+            pendingMessage = message
+            pendingAction = action
+        } else {
+            action()
+        }
+    }
 
     // APK file picker
     val apkPickerLauncher = rememberLauncherForActivityResult(
@@ -139,19 +159,10 @@ fun AppManagerScreen(
                     }
                 }
             } else if (uiState.error.isNotEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Filled.ErrorOutline, null, modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(uiState.error, color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.refresh() }) { Text(strings.retry) }
-                    }
-                }
+                EmptyDevicePlaceholder(
+                    onRetry = { viewModel.refresh() },
+                    message = uiState.error
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -160,10 +171,10 @@ fun AppManagerScreen(
                     items(uiState.filteredPackages) { pkg ->
                         AppItemRow(
                             packageName = pkg,
-                            onForceStop = { viewModel.forceStop(pkg) },
-                            onUninstall = { viewModel.uninstall(pkg) },
-                            onClearData = { viewModel.clearData(pkg) },
-                            onDisable = { viewModel.disable(pkg) },
+                            onForceStop = { runDangerous(strings.appForceStop, "Force stop $pkg?", { viewModel.forceStop(pkg) }) },
+                            onUninstall = { runDangerous(strings.appUninstall, "Uninstall $pkg? This cannot be undone.", { viewModel.uninstall(pkg) }) },
+                            onClearData = { runDangerous(strings.appClearData, "Clear all data of $pkg?", { viewModel.clearData(pkg) }) },
+                            onDisable = { runDangerous(strings.appFreeze, "Disable $pkg? System apps may become unstable.", { viewModel.disable(pkg) }) },
                             onEnable = { viewModel.enable(pkg) },
                             onBackup = { viewModel.backup(pkg) },
                             onLaunch = { viewModel.launch(pkg) },
@@ -180,6 +191,22 @@ fun AppManagerScreen(
                 packageName = uiState.selectedPackage,
                 details = uiState.appDetails,
                 onDismiss = { viewModel.hideDetail() }
+            )
+        }
+
+        // Dangerous action confirmation
+        if (pendingAction != null) {
+            ConfirmDialog(
+                title = pendingTitle,
+                message = pendingMessage,
+                confirmText = strings.confirm,
+                dismissText = strings.cancel,
+                isDestructive = true,
+                onConfirm = {
+                    pendingAction?.invoke()
+                    pendingAction = null
+                },
+                onDismiss = { pendingAction = null }
             )
         }
 
