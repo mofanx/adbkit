@@ -14,6 +14,7 @@ interface AppStrings {
     val settings: String
     val refresh: String
     val cancel: String
+    val stop: String
     val confirm: String
     val close: String
     val ok: String

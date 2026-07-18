@@ -10,6 +10,7 @@ object EnStrings : AppStrings {
     override val settings = "Settings"
     override val refresh = "Refresh"
     override val cancel = "Cancel"
+    override val stop = "Stop"
     override val confirm = "Confirm"
     override val close = "Close"
     override val ok = "OK"

@@ -136,8 +136,14 @@ fun ToolsScreen(
             Snackbar(
                 modifier = Modifier.padding(16.dp),
                 action = {
-                    TextButton(onClick = { viewModel.clearStatus() }) {
-                        Text(LocalStrings.current.ok)
+                    if (uiState.isRecording) {
+                        TextButton(onClick = { viewModel.stopScreenRecord() }) {
+                            Text(LocalStrings.current.stop)
+                        }
+                    } else {
+                        TextButton(onClick = { viewModel.clearStatus() }) {
+                            Text(LocalStrings.current.ok)
+                        }
                     }
                 }
             ) {

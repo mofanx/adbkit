@@ -3,6 +3,8 @@ package com.adbkit.app.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,12 +15,15 @@ data class ToolsUiState(
     val activeDialog: String = "",
     val statusMessage: String = "",
     val commandOutput: String = "",
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val isRecording: Boolean = false,
+    val lastScreenshotPath: String = ""
 )
 
 class ToolsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ToolsUiState())
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
+    private var screenRecordJob: Job? = null
 
     fun executeTool(action: String) {
         when (action) {
@@ -55,22 +60,52 @@ class ToolsViewModel : ViewModel() {
 
     private fun takeScreenshot() {
         viewModelScope.launch {
+            val path = "/sdcard/screenshot_adbkit.png"
             _uiState.update { it.copy(statusMessage = "Taking screenshot...") }
-            val result = AdbService.shell("screencap -p /sdcard/screenshot_adbkit.png")
+            val result = AdbService.shell("screencap -p $path")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Screenshot saved to /sdcard/screenshot_adbkit.png" else "Screenshot failed: ${result.error}")
+                it.copy(
+                    statusMessage = if (result.success) "Screenshot saved to $path" else "Screenshot failed: ${result.error}",
+                    lastScreenshotPath = if (result.success) path else ""
+                )
             }
         }
     }
 
     private fun startScreenRecord() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Recording (max 3min)...") }
-            val result = AdbService.shell("screenrecord --time-limit 180 /sdcard/screenrecord_adbkit.mp4 &")
-            _uiState.update {
-                it.copy(statusMessage = if (result.success) "Recording... File: /sdcard/screenrecord_adbkit.mp4" else "Record failed: ${result.error}")
+        if (screenRecordJob?.isActive == true) return
+        val path = "/sdcard/screenrecord_adbkit.mp4"
+        screenRecordJob?.cancel()
+        screenRecordJob = viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isRecording = true, statusMessage = "Recording... File: $path") }
+                val result = AdbService.shell("screenrecord --time-limit 180 $path")
+                if (result.success || result.error.contains("killed", ignoreCase = true)) {
+                    _uiState.update { it.copy(isRecording = false, statusMessage = "Recording saved to $path") }
+                } else {
+                    _uiState.update { it.copy(isRecording = false, statusMessage = "Record failed: ${result.error}") }
+                }
+            } catch (e: CancellationException) {
+                stopScreenRecordProcess(path)
             }
         }
+    }
+
+    fun stopScreenRecord() {
+        val path = "/sdcard/screenrecord_adbkit.mp4"
+        screenRecordJob?.cancel()
+        screenRecordJob = null
+        viewModelScope.launch {
+            stopScreenRecordProcess(path)
+            _uiState.update { it.copy(isRecording = false, statusMessage = "Recording stopped. File: $path") }
+        }
+    }
+
+    private suspend fun stopScreenRecordProcess(path: String) {
+        // Send SIGINT to any screenrecord process on the device
+        AdbService.shell("pkill -2 screenrecord 2>/dev/null || kill -2 \$(pidof screenrecord) 2>/dev/null || true")
+        // Give the process a moment to flush and stop
+        AdbService.shell("sleep 1")
     }
 
     fun reboot(mode: String) {

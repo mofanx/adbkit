@@ -10,6 +10,7 @@ object ZhStrings : AppStrings {
     override val settings = "设置"
     override val refresh = "刷新"
     override val cancel = "取消"
+    override val stop = "停止"
     override val confirm = "确认"
     override val close = "关闭"
     override val ok = "确定"
