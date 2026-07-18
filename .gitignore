@@ -14,3 +14,4 @@ app/build/
 app/release/
 *.apk
 *.aab
+.kotlin/

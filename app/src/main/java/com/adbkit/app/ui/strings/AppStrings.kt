@@ -257,6 +257,9 @@ interface AppStrings {
     val notConnected: String
     val enterCommand: String
     val history: String
+    val favorites: String
+    val addFavorite: String
+    val removeFavorite: String
     val switchedToShellMode: String
     val switchedToCommandMode: String
     val cleared: String
@@ -286,6 +289,7 @@ interface AppStrings {
 
     // Remote Control screen
     val remoteControl: String
+    val remoteControlConnectHint: String
     val fullscreen: String
     val gettingScreen: String
     val fpsOverlay: (Int) -> String

@@ -19,7 +19,9 @@ data class TerminalUiState(
     val isShellMode: Boolean = true,
     val isExecuting: Boolean = false,
     val commandHistory: List<String> = emptyList(),
+    val commandFavorites: List<String> = emptyList(),
     val showHistory: Boolean = false,
+    val showFavorites: Boolean = false,
     val currentDevice: String? = null
 )
 
@@ -34,6 +36,11 @@ class TerminalViewModel : ViewModel() {
         viewModelScope.launch {
             repo.commandHistory.collect { history ->
                 _uiState.update { it.copy(commandHistory = history) }
+            }
+        }
+        viewModelScope.launch {
+            repo.commandFavorites.collect { favorites ->
+                _uiState.update { it.copy(commandFavorites = favorites) }
             }
         }
         viewModelScope.launch {
@@ -56,7 +63,23 @@ class TerminalViewModel : ViewModel() {
     }
 
     fun toggleHistory() {
-        _uiState.update { it.copy(showHistory = !it.showHistory) }
+        _uiState.update { it.copy(showHistory = !it.showHistory, showFavorites = false) }
+    }
+
+    fun toggleFavorites() {
+        _uiState.update { it.copy(showFavorites = !it.showFavorites, showHistory = false) }
+    }
+
+    fun addFavorite(command: String) {
+        viewModelScope.launch {
+            repo.addCommandFavorite(command)
+        }
+    }
+
+    fun removeFavorite(command: String) {
+        viewModelScope.launch {
+            repo.removeCommandFavorite(command)
+        }
     }
 
     fun clearOutput() {

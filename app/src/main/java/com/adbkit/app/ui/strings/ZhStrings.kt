@@ -243,6 +243,9 @@ object ZhStrings : AppStrings {
     override val notConnected = "未连接"
     override val enterCommand = "输入命令..."
     override val history = "历史"
+    override val favorites = "收藏"
+    override val addFavorite = "加入收藏"
+    override val removeFavorite = "取消收藏"
     override val switchedToShellMode = "--- 切换到 ADB Shell 模式 ---"
     override val switchedToCommandMode = "--- 切换到 ADB 命令模式 ---"
     override val cleared = "--- 已清屏 ---"
@@ -272,6 +275,7 @@ object ZhStrings : AppStrings {
 
     // Remote Control
     override val remoteControl = "远程控制"
+    override val remoteControlConnectHint = "请先返回首页连接设备，再回到本页面开始投屏。"
     override val fullscreen = "全屏"
     override val gettingScreen = "正在获取画面..."
     override val fpsOverlay = { fps: Int -> "$fps fps" }

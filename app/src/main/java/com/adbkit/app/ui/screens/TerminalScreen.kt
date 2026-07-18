@@ -136,6 +136,44 @@ fun TerminalScreen(
                 }
             }
 
+            // Command favorites
+            if (uiState.showFavorites && uiState.commandFavorites.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 150.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    tonalElevation = 2.dp
+                ) {
+                    LazyColumn(modifier = Modifier.padding(4.dp)) {
+                        items(uiState.commandFavorites) { cmd ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = { viewModel.setCommand(cmd) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = cmd,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.removeFavorite(cmd) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(Icons.Filled.Close, contentDescription = strings.removeFavorite, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Command history
             if (uiState.showHistory && uiState.commandHistory.isNotEmpty()) {
                 Surface(
@@ -190,6 +228,15 @@ fun TerminalScreen(
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
+                        onClick = { viewModel.addFavorite(uiState.currentCommand) },
+                        enabled = uiState.currentCommand.isNotBlank()
+                    ) {
+                        Icon(Icons.Filled.Star, contentDescription = strings.addFavorite)
+                    }
+                    IconButton(onClick = { viewModel.toggleFavorites() }) {
+                        Icon(Icons.Filled.Star, contentDescription = strings.favorites)
+                    }
                     IconButton(onClick = { viewModel.toggleHistory() }) {
                         Icon(Icons.Filled.History, contentDescription = strings.history)
                     }

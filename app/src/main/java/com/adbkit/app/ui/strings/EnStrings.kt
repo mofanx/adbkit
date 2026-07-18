@@ -243,6 +243,9 @@ object EnStrings : AppStrings {
     override val notConnected = "Not connected"
     override val enterCommand = "Enter command..."
     override val history = "History"
+    override val favorites = "Favorites"
+    override val addFavorite = "Add Favorite"
+    override val removeFavorite = "Remove Favorite"
     override val switchedToShellMode = "--- Switched to ADB Shell Mode ---"
     override val switchedToCommandMode = "--- Switched to ADB Command Mode ---"
     override val cleared = "--- Cleared ---"
@@ -272,6 +275,7 @@ object EnStrings : AppStrings {
 
     // Remote Control
     override val remoteControl = "Remote Control"
+    override val remoteControlConnectHint = "Please connect a device in the Home page first, then return here to start screen mirroring."
     override val fullscreen = "Fullscreen"
     override val gettingScreen = "Getting screen..."
     override val fpsOverlay = { fps: Int -> "$fps fps" }

@@ -24,6 +24,7 @@ class SettingsRepository(private val context: Context) {
         val LAST_DEVICE_IP = stringPreferencesKey("last_device_ip")
         val CONNECTION_HISTORY = stringPreferencesKey("connection_history")
         val COMMAND_HISTORY = stringPreferencesKey("command_history")
+        val COMMAND_FAVORITES = stringPreferencesKey("command_favorites")
         val LANGUAGE = stringPreferencesKey("language")
         val DEVICE_CLICK_TARGET = stringPreferencesKey("device_click_target")
     }
@@ -46,6 +47,10 @@ class SettingsRepository(private val context: Context) {
     val deviceClickTarget: Flow<String> = context.dataStore.data.map { it[DEVICE_CLICK_TARGET] ?: "device_info" }
     val commandHistory: Flow<List<String>> = context.dataStore.data.map { prefs ->
         val raw = prefs[COMMAND_HISTORY] ?: ""
+        if (raw.isBlank()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
+    }
+    val commandFavorites: Flow<List<String>> = context.dataStore.data.map { prefs ->
+        val raw = prefs[COMMAND_FAVORITES] ?: ""
         if (raw.isBlank()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
     }
 
@@ -137,5 +142,25 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun clearCommandHistory() {
         context.dataStore.edit { it.remove(COMMAND_HISTORY) }
+    }
+
+    suspend fun addCommandFavorite(command: String) {
+        if (command.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val raw = prefs[COMMAND_FAVORITES] ?: ""
+            val list = if (raw.isBlank()) mutableListOf() else raw.split("\n").filter { it.isNotBlank() }.toMutableList()
+            list.remove(command)
+            list.add(0, command)
+            if (list.size > 20) list.subList(20, list.size).clear()
+            prefs[COMMAND_FAVORITES] = list.joinToString("\n")
+        }
+    }
+
+    suspend fun removeCommandFavorite(command: String) {
+        context.dataStore.edit { prefs ->
+            val raw = prefs[COMMAND_FAVORITES] ?: ""
+            val list = raw.split("\n").filter { it.isNotBlank() && it != command }
+            prefs[COMMAND_FAVORITES] = list.joinToString("\n")
+        }
     }
 }
