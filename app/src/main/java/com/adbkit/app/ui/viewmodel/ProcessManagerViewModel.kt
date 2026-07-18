@@ -18,6 +18,17 @@ data class MemoryInfo(
     val usedPercent: Float get() = if (totalKb > 0) usedKb.toFloat() / totalKb else 0f
 }
 
+data class ProcessDetails(
+    val pid: String = "",
+    val name: String = "",
+    val commandLine: String = "",
+    val threads: String = "",
+    val ppid: String = "",
+    val cpuTime: String = "",
+    val residentPages: String = "",
+    val error: String = ""
+)
+
 data class ProcessManagerUiState(
     val processes: List<Map<String, String>> = emptyList(),
     val runningApps: List<Map<String, String>> = emptyList(),
@@ -29,7 +40,8 @@ data class ProcessManagerUiState(
     val memoryInfo: MemoryInfo = MemoryInfo(),
     val showAppsOnly: Boolean = true,
     val sortMode: SortMode = SortMode.MEMORY,
-    val sortAscending: Boolean = false
+    val sortAscending: Boolean = false,
+    val processDetails: ProcessDetails? = null
 ) {
     enum class SortMode { MEMORY, PID, NAME, CPU }
 
@@ -131,6 +143,32 @@ class ProcessManagerViewModel : ViewModel() {
                 sortAscending = if (it.sortMode == mode) !it.sortAscending else false
             )
         }
+    }
+
+    fun showProcessDetails(pid: String, name: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = AdbService.getProcessDetails(pid)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    processDetails = ProcessDetails(
+                        pid = pid,
+                        name = name,
+                        commandLine = result["commandLine"] ?: "",
+                        threads = result["threads"] ?: "",
+                        ppid = result["ppid"] ?: "",
+                        cpuTime = result["cpuTime"] ?: "",
+                        residentPages = result["residentPages"] ?: "",
+                        error = result["commandLine"].isNullOrEmpty().let { if (it) "Unable to read process details" else "" }
+                    )
+                )
+            }
+        }
+    }
+
+    fun dismissProcessDetails() {
+        _uiState.update { it.copy(processDetails = null) }
     }
 
     fun killProcess(pid: String) {

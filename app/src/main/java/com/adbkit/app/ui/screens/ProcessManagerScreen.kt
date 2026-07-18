@@ -3,7 +3,9 @@ package com.adbkit.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -224,7 +226,8 @@ fun ProcessManagerScreen(
                         RunningAppCard(
                             app = app,
                             onForceStop = { viewModel.forceStopApp(app["name"] ?: "") },
-                            onKill = { viewModel.killProcess(app["pid"] ?: "") }
+                            onKill = { viewModel.killProcess(app["pid"] ?: "") },
+                            onDetails = { viewModel.showProcessDetails(app["pid"] ?: "", app["name"] ?: "") }
                         )
                     }
                 }
@@ -258,11 +261,20 @@ fun ProcessManagerScreen(
                     items(uiState.filteredProcesses) { process ->
                         ProcessRow(
                             process = process,
-                            onKill = { viewModel.killProcess(process["pid"] ?: "") }
+                            onKill = { viewModel.killProcess(process["pid"] ?: "") },
+                            onDetails = { viewModel.showProcessDetails(process["pid"] ?: "", process["name"] ?: "") }
                         )
                     }
                 }
             }
+        }
+
+        // Process details dialog
+        uiState.processDetails?.let { details ->
+            ProcessDetailsDialog(
+                details = details,
+                onDismiss = { viewModel.dismissProcessDetails() }
+            )
         }
     }
 }
@@ -271,7 +283,8 @@ fun ProcessManagerScreen(
 fun RunningAppCard(
     app: Map<String, String>,
     onForceStop: () -> Unit,
-    onKill: () -> Unit
+    onKill: () -> Unit,
+    onDetails: () -> Unit = {}
 ) {
     val strings = LocalStrings.current
     Card(
@@ -313,6 +326,14 @@ fun RunningAppCard(
                 Text(strings.appForceStop, style = MaterialTheme.typography.labelSmall)
             }
             Spacer(modifier = Modifier.width(4.dp))
+            IconButton(onClick = onDetails, modifier = Modifier.size(32.dp)) {
+                Icon(
+                    Icons.Filled.Info,
+                    contentDescription = strings.details,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
             IconButton(onClick = onKill, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Close,
@@ -328,7 +349,8 @@ fun RunningAppCard(
 @Composable
 fun ProcessRow(
     process: Map<String, String>,
-    onKill: () -> Unit
+    onKill: () -> Unit,
+    onDetails: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -354,6 +376,14 @@ fun ProcessRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        IconButton(onClick = onDetails, modifier = Modifier.size(32.dp)) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = LocalStrings.current.details,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
         IconButton(onClick = onKill, modifier = Modifier.size(32.dp)) {
             Icon(
                 Icons.Filled.Close,
@@ -363,6 +393,54 @@ fun ProcessRow(
             )
         }
     }
+}
+
+@Composable
+fun ProcessDetailsDialog(
+    details: com.adbkit.app.ui.viewmodel.ProcessDetails,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalStrings.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("${details.name} (${details.pid})") },
+        text = {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 320.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                val scrollState = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (details.error.isNotEmpty()) {
+                        Text(text = details.error, color = MaterialTheme.colorScheme.error)
+                    } else {
+                        Text(text = "${strings.detailsPid}: ${details.pid}")
+                        Text(text = "${strings.detailsPpid}: ${details.ppid}")
+                        Text(text = "${strings.detailsThreads}: ${details.threads}")
+                        Text(text = "${strings.detailsCpuTime}: ${details.cpuTime}")
+                        Text(text = "${strings.detailsResidentPages}: ${details.residentPages}")
+                        Text(
+                            text = "${strings.detailsCommandLine}: ${details.commandLine}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(strings.close) }
+        }
+    )
 }
 
 private fun formatMemory(kbStr: String): String {

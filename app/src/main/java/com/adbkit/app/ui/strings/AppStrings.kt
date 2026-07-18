@@ -255,6 +255,13 @@ interface AppStrings {
     val processName: String
     val cpu: String
     val killProcess: String
+    val details: String
+    val detailsPid: String
+    val detailsPpid: String
+    val detailsThreads: String
+    val detailsCpuTime: String
+    val detailsResidentPages: String
+    val detailsCommandLine: String
 
     // Terminal screen
     val terminal: String

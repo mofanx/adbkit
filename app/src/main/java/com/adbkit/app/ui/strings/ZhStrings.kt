@@ -241,6 +241,13 @@ object ZhStrings : AppStrings {
     override val processName = "进程名"
     override val cpu = "CPU"
     override val killProcess = "结束进程"
+    override val details = "详情"
+    override val detailsPid = "进程 ID"
+    override val detailsPpid = "父进程 ID"
+    override val detailsThreads = "线程数"
+    override val detailsCpuTime = "CPU 时间"
+    override val detailsResidentPages = "常驻页"
+    override val detailsCommandLine = "命令行"
 
     // Terminal
     override val terminal = "运行命令"

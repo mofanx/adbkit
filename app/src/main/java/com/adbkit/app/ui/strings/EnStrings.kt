@@ -241,6 +241,13 @@ object EnStrings : AppStrings {
     override val processName = "Process"
     override val cpu = "CPU"
     override val killProcess = "Kill Process"
+    override val details = "Details"
+    override val detailsPid = "PID"
+    override val detailsPpid = "Parent PID"
+    override val detailsThreads = "Threads"
+    override val detailsCpuTime = "CPU Time"
+    override val detailsResidentPages = "Resident Pages"
+    override val detailsCommandLine = "Command Line"
 
     // Terminal
     override val terminal = "Terminal"

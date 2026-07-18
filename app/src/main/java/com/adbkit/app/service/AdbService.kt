@@ -496,6 +496,53 @@ object AdbService {
         return shell("kill -9 ${shellQuote(pid)}")
     }
 
+    suspend fun getProcessDetails(pid: String): Map<String, String> {
+        val details = mutableMapOf<String, String>()
+        details["pid"] = pid
+
+        val cmdlineResult = shell("cat /proc/$pid/cmdline")
+        if (cmdlineResult.success) {
+            val cmdline = cmdlineResult.output.replace('\u0000', ' ').trim()
+            details["commandLine"] = cmdline.ifEmpty { "(empty)" }
+        }
+
+        val statusResult = shell("cat /proc/$pid/status")
+        if (statusResult.success) {
+            statusResult.output.lines().forEach { line ->
+                when {
+                    line.startsWith("Threads:") -> details["threads"] = line.substringAfter(":").trim()
+                    line.startsWith("PPid:") -> details["ppid"] = line.substringAfter(":").trim()
+                    line.startsWith("Name:") -> details["procName"] = line.substringAfter(":").trim()
+                }
+            }
+        }
+
+        val statResult = shell("cat /proc/$pid/stat")
+        if (statResult.success) {
+            val parts = statResult.output.split(" ")
+            if (parts.size > 21) {
+                try {
+                    val utime = parts[13].toLongOrNull() ?: 0L
+                    val stime = parts[14].toLongOrNull() ?: 0L
+                    val starttime = parts[21].toLongOrNull() ?: 0L
+                    details["cpuTime"] = "${utime + stime}"
+                    details["startTime"] = starttime.toString()
+                } catch (_: Exception) {}
+            }
+        }
+
+        val statmResult = shell("cat /proc/$pid/statm")
+        if (statmResult.success) {
+            val parts = statmResult.output.split(" ")
+            if (parts.isNotEmpty()) {
+                val pages = parts[0].toLongOrNull() ?: 0L
+                details["residentPages"] = "${pages * 4}KB"
+            }
+        }
+
+        return details
+    }
+
     suspend fun getRunningApps(): List<Map<String, String>> {
         // Get running app processes with memory usage via dumpsys meminfo
         val result = shell("dumpsys meminfo --local -s")
