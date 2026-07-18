@@ -355,6 +355,12 @@ object AdbService {
         return adb("pull", shellQuote(remotePath), shellQuote(localPath))
     }
 
+    suspend fun readFilePreview(remotePath: String, maxBytes: Int = 100000): CommandResult {
+        val q = shellQuote(remotePath)
+        val max = maxBytes.coerceIn(1, 500000)
+        return shell("head -c $max $q")
+    }
+
     suspend fun pushFile(localPath: String, remotePath: String): CommandResult {
         return adb("push", shellQuote(localPath), shellQuote(remotePath))
     }

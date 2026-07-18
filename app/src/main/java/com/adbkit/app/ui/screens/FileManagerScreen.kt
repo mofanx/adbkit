@@ -5,9 +5,12 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -274,7 +278,8 @@ fun FileManagerScreen(
                             onPull = { viewModel.pullFile(path, file["name"] ?: "") },
                             onRename = { pendingRename = path },
                             onMove = { pendingMove = path },
-                            onCopy = { pendingCopy = path }
+                            onCopy = { pendingCopy = path },
+                            onPreview = { viewModel.showPreview(path, file["name"] ?: "") }
                         )
                     }
 
@@ -407,6 +412,14 @@ fun FileManagerScreen(
             )
         }
 
+        // File preview dialog
+        uiState.preview?.let { preview ->
+            PreviewFileDialog(
+                preview = preview,
+                onDismiss = { viewModel.dismissPreview() }
+            )
+        }
+
         // Create directory dialog
         if (uiState.showCreateDirDialog) {
             var dirName by remember { mutableStateOf("") }
@@ -496,7 +509,8 @@ fun FileItemRow(
     onPull: () -> Unit,
     onRename: () -> Unit = {},
     onMove: () -> Unit = {},
-    onCopy: () -> Unit = {}
+    onCopy: () -> Unit = {},
+    onPreview: () -> Unit = {}
 ) {
     val isDir = file["isDirectory"] == "true"
     val name = file["name"] ?: ""
@@ -582,6 +596,14 @@ fun FileItemRow(
                             },
                             leadingIcon = { Icon(Icons.Filled.Download, null) }
                         )
+                        DropdownMenuItem(
+                            text = { Text(LocalStrings.current.preview) },
+                            onClick = {
+                                showMenu = false
+                                onPreview()
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Visibility, null) }
+                        )
                     }
                     DropdownMenuItem(
                         text = { Text(LocalStrings.current.rename) },
@@ -621,4 +643,71 @@ fun FileItemRow(
             }
         }
     }
+}
+
+@Composable
+fun PreviewFileDialog(
+    preview: com.adbkit.app.ui.viewmodel.FilePreview,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalStrings.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(preview.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 100.dp, max = 400.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier.padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (preview.type) {
+                        com.adbkit.app.ui.viewmodel.FilePreviewType.TEXT -> {
+                            val scrollState = rememberScrollState()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(scrollState)
+                            ) {
+                                Text(
+                                    text = preview.text,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        com.adbkit.app.ui.viewmodel.FilePreviewType.IMAGE -> {
+                            if (preview.bitmap != null) {
+                                androidx.compose.foundation.Image(
+                                    bitmap = preview.bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    text = preview.error.ifEmpty { strings.previewImageError },
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        com.adbkit.app.ui.viewmodel.FilePreviewType.UNSUPPORTED -> {
+                            Text(
+                                text = preview.error.ifEmpty { strings.unsupportedPreview },
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(strings.close) }
+        }
+    )
 }

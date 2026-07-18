@@ -240,6 +240,9 @@ interface AppStrings {
     val folderName: String
     val create: String
     val downloadToLocal: String
+    val preview: String
+    val previewImageError: String
+    val unsupportedPreview: String
     val rootRequired: String
     val rootRequiredMessage: String
 

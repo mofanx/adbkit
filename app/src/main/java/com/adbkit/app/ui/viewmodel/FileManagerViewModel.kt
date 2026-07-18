@@ -1,7 +1,10 @@
 package com.adbkit.app.ui.viewmodel
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Environment
 import androidx.lifecycle.ViewModel
+import java.io.File
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,6 +12,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+enum class FilePreviewType { TEXT, IMAGE, UNSUPPORTED }
+
+data class FilePreview(
+    val path: String,
+    val name: String,
+    val type: FilePreviewType,
+    val text: String = "",
+    val bitmap: Bitmap? = null,
+    val error: String = ""
+)
 
 data class FileManagerUiState(
     val currentPath: String = "/sdcard",
@@ -21,7 +35,8 @@ data class FileManagerUiState(
     val requestFilePick: Boolean = false,
     val hasRootAccess: Boolean = false,
     val selectedFiles: Set<String> = emptySet(),
-    val isSelectionMode: Boolean = false
+    val isSelectionMode: Boolean = false,
+    val preview: FilePreview? = null
 )
 
 class FileManagerViewModel : ViewModel() {
@@ -215,6 +230,64 @@ class FileManagerViewModel : ViewModel() {
 
     fun hideCreateDirDialog() {
         _uiState.update { it.copy(showCreateDirDialog = false) }
+    }
+
+    fun showPreview(path: String, name: String) {
+        viewModelScope.launch {
+            val lower = name.lowercase()
+            val isImage = listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp").any { lower.endsWith(it) }
+            val isText = listOf(
+                ".txt", ".md", ".log", ".csv", ".json", ".xml", ".html", ".htm",
+                ".kt", ".java", ".py", ".js", ".c", ".cpp", ".h", ".sh", ".gradle",
+                ".properties", ".ini", ".cfg", ".yaml", ".yml", ".conf"
+            ).any { lower.endsWith(it) }
+
+            when {
+                isImage -> {
+                    _uiState.update { it.copy(isLoading = true) }
+                    val local = File.createTempFile("preview_", "_${name}", Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS))
+                    val result = AdbService.pullFile(path, local.absolutePath)
+                    if (result.success) {
+                        val bitmap = BitmapFactory.decodeFile(local.absolutePath)
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                preview = FilePreview(path, name, FilePreviewType.IMAGE, bitmap = bitmap)
+                            )
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                preview = FilePreview(path, name, FilePreviewType.IMAGE, error = result.error)
+                            )
+                        }
+                    }
+                }
+                isText -> {
+                    _uiState.update { it.copy(isLoading = true) }
+                    val result = AdbService.readFilePreview(path, 100000)
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            preview = FilePreview(
+                                path, name, FilePreviewType.TEXT,
+                                text = if (result.success) result.output else "Preview failed: ${result.error}"
+                            )
+                        )
+                    }
+                }
+                else -> {
+                    _uiState.update {
+                        it.copy(preview = FilePreview(path, name, FilePreviewType.UNSUPPORTED, error = "Unsupported file type"))
+                    }
+                }
+            }
+        }
+    }
+
+    fun dismissPreview() {
+        _uiState.update { it.copy(preview = null) }
     }
 
     fun createDirectory(name: String) {
