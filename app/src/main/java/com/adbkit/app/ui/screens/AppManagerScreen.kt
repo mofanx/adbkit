@@ -93,6 +93,10 @@ fun AppManagerScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.exportAppList(context) }) {
+                        @Suppress("DEPRECATION")
+                        Icon(Icons.Filled.List, contentDescription = strings.exportAppList)
+                    }
                     IconButton(onClick = { viewModel.requestInstallApk() }) {
                         Icon(Icons.Filled.InstallMobile, contentDescription = strings.installApk)
                     }

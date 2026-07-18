@@ -367,6 +367,7 @@ object ZhStrings : AppStrings {
     override val installing = "安装中..."
     override val installSuccess = "安装成功"
     override val installFailed = "安装失败"
+    override val exportAppList = "导出应用列表"
 
     // Process management
     override val memoryUsage = "内存占用"

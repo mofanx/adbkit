@@ -1,13 +1,16 @@
 package com.adbkit.app.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class AppManagerUiState(
     val userPackages: List<String> = emptyList(),
@@ -186,6 +189,31 @@ class AppManagerViewModel : ViewModel() {
                 )
             }
             if (installResult.success) refresh()
+        }
+    }
+
+    fun exportAppList(context: Context) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(statusMessage = "Exporting app list...") }
+            try {
+                val packages = if (_uiState.value.showSystemApps) _uiState.value.systemPackages else _uiState.value.userPackages
+                val typeLabel = if (_uiState.value.showSystemApps) "system" else "user"
+                val content = buildString {
+                    appendLine("# ADB Kit App List (${typeLabel}, ${packages.size} packages)")
+                    appendLine("# Generated at ${java.text.SimpleDateFormat.getDateTimeInstance().format(java.util.Date())}")
+                    packages.forEach { appendLine(it) }
+                }
+                val tempFile = File(context.cacheDir, "app_list_adbkit.txt")
+                tempFile.writeText(content)
+                val remotePath = "/sdcard/app_list_adbkit.txt"
+                val result = AdbService.pushFile(tempFile.absolutePath, remotePath)
+                tempFile.delete()
+                _uiState.update {
+                    it.copy(statusMessage = if (result.success) "App list exported to $remotePath" else "Export failed: ${result.error}")
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(statusMessage = "Export failed: ${e.message}") }
+            }
         }
     }
 }
