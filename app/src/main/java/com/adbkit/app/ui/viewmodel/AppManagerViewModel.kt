@@ -21,6 +21,7 @@ data class AppManagerUiState(
     val showDetailDialog: Boolean = false,
     val selectedPackage: String = "",
     val appDetails: Map<String, String> = emptyMap(),
+    val appPermissions: List<String> = emptyList(),
     val isInstalling: Boolean = false,
     val requestApkPick: Boolean = false
 ) {
@@ -144,12 +145,13 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(selectedPackage = pkg, showDetailDialog = true) }
             val details = AdbService.getAppDetail(pkg)
-            _uiState.update { it.copy(appDetails = details) }
+            val permissions = AdbService.getAppPermissions(pkg)
+            _uiState.update { it.copy(appDetails = details, appPermissions = permissions) }
         }
     }
 
     fun hideDetail() {
-        _uiState.update { it.copy(showDetailDialog = false, selectedPackage = "", appDetails = emptyMap()) }
+        _uiState.update { it.copy(showDetailDialog = false, selectedPackage = "", appDetails = emptyMap(), appPermissions = emptyList()) }
     }
 
     fun clearStatus() {

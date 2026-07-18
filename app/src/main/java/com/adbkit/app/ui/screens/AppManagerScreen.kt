@@ -190,6 +190,7 @@ fun AppManagerScreen(
             AppDetailDialog(
                 packageName = uiState.selectedPackage,
                 details = uiState.appDetails,
+                permissions = uiState.appPermissions,
                 onDismiss = { viewModel.hideDetail() }
             )
         }
@@ -325,6 +326,7 @@ fun AppItemRow(
 fun AppDetailDialog(
     packageName: String,
     details: Map<String, String>,
+    permissions: List<String> = emptyList(),
     onDismiss: () -> Unit
 ) {
     val strings = LocalStrings.current
@@ -360,6 +362,29 @@ fun AppDetailDialog(
                             text = value,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                if (permissions.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Permissions",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(permissions) { permission ->
+                        val cleaned = permission
+                            .substringAfterLast(".")
+                            .replace("_", " ")
+                            .replace("permission", "", ignoreCase = true)
+                            .trim()
+                        Text(
+                            text = "• ${if (cleaned.isNotBlank()) cleaned else permission}",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 2.dp)
                         )
                     }
                 }
