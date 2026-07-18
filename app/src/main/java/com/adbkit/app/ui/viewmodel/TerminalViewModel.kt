@@ -1,5 +1,8 @@
 package com.adbkit.app.ui.viewmodel
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
@@ -22,8 +25,13 @@ data class TerminalUiState(
     val commandFavorites: List<String> = emptyList(),
     val showHistory: Boolean = false,
     val showFavorites: Boolean = false,
+    val searchQuery: String = "",
     val currentDevice: String? = null
-)
+) {
+    val filteredOutputLines: List<String>
+        get() = if (searchQuery.isBlank()) outputLines
+        else outputLines.filter { it.contains(searchQuery, ignoreCase = true) }
+}
 
 class TerminalViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(TerminalUiState(currentDevice = AdbService.getCurrentDevice()))
@@ -52,6 +60,18 @@ class TerminalViewModel : ViewModel() {
 
     fun setCommand(cmd: String) {
         _uiState.update { it.copy(currentCommand = cmd, showHistory = false) }
+    }
+
+    fun updateSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun copyAllOutput(context: Context): String {
+        val text = _uiState.value.outputLines.joinToString("\n")
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Terminal output", text)
+        clipboard.setPrimaryClip(clip)
+        return text
     }
 
     fun toggleShellMode() {

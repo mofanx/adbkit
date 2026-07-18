@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +51,10 @@ fun TerminalScreen(
                     }
                 },
                 actions = {
+                    val context = LocalContext.current
+                    IconButton(onClick = { viewModel.copyAllOutput(context) }) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = strings.copy)
+                    }
                     IconButton(onClick = { viewModel.clearOutput() }) {
                         Icon(Icons.Filled.DeleteSweep, contentDescription = strings.clearScreen)
                     }
@@ -111,6 +116,21 @@ fun TerminalScreen(
                 }
             }
 
+            // Output search
+            if (uiState.outputLines.size > 20) {
+                OutlinedTextField(
+                    value = uiState.searchQuery,
+                    onValueChange = { viewModel.updateSearchQuery(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    placeholder = { Text(strings.search) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(20.dp)
+                )
+            }
+
             // Output area
             LazyColumn(
                 modifier = Modifier
@@ -120,7 +140,7 @@ fun TerminalScreen(
                     .padding(8.dp),
                 state = listState
             ) {
-                items(uiState.outputLines) { line ->
+                items(uiState.filteredOutputLines) { line ->
                     Text(
                         text = line,
                         color = when {
