@@ -31,6 +31,8 @@ import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.ui.components.ConfirmDialog
 import com.adbkit.app.ui.components.EmptyDevicePlaceholder
+import com.adbkit.app.ui.components.EmptyState
+import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FileManagerViewModel
 import java.io.File
@@ -237,16 +239,17 @@ fun FileManagerScreen(
             }
 
             if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                LoadingState(message = strings.loading)
             } else if (uiState.error.isNotEmpty()) {
                 EmptyDevicePlaceholder(
                     onRetry = { viewModel.refresh() },
                     message = uiState.error
+                )
+            } else if (uiState.files.isEmpty()) {
+                EmptyState(
+                    title = strings.emptyDir,
+                    actionLabel = strings.refresh,
+                    onAction = { viewModel.refresh() }
                 )
             } else {
                 LazyColumn(
@@ -282,19 +285,6 @@ fun FileManagerScreen(
                             onPreview = { viewModel.showPreview(path, file["name"] ?: "") },
                             onInstall = { viewModel.installApk(path, file["name"] ?: "") }
                         )
-                    }
-
-                    if (uiState.files.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(strings.emptyDir, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
                     }
                 }
             }

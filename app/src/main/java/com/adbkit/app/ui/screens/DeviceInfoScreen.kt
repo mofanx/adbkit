@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.components.EmptyDevicePlaceholder
+import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.DeviceInfoViewModel
 
@@ -62,18 +63,10 @@ fun DeviceInfoScreen(
         }
     ) { padding ->
         if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(strings.gettingDeviceInfo)
-                }
-            }
+            LoadingState(
+                message = strings.gettingDeviceInfo,
+                modifier = Modifier.padding(padding)
+            )
         } else if (uiState.error.isNotEmpty()) {
             EmptyDevicePlaceholder(
                 onRetry = { viewModel.refresh() },

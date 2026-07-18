@@ -18,6 +18,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.components.EmptyDevicePlaceholder
+import com.adbkit.app.ui.components.EmptyState
+import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.ProcessManagerUiState
 import com.adbkit.app.ui.viewmodel.ProcessManagerViewModel
@@ -197,16 +199,17 @@ fun ProcessManagerScreen(
             }
 
             if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                LoadingState(message = strings.loading)
             } else if (uiState.error.isNotEmpty()) {
                 EmptyDevicePlaceholder(
                     onRetry = { viewModel.refresh() },
                     message = uiState.error
+                )
+            } else if (uiState.showAppsOnly && uiState.filteredApps.isEmpty()) {
+                EmptyState(
+                    title = strings.noData,
+                    actionLabel = strings.refresh,
+                    onAction = { viewModel.refresh() }
                 )
             } else if (uiState.showAppsOnly) {
                 // Running apps view
@@ -231,6 +234,12 @@ fun ProcessManagerScreen(
                         )
                     }
                 }
+            } else if (uiState.filteredProcesses.isEmpty()) {
+                EmptyState(
+                    title = strings.noData,
+                    actionLabel = strings.refresh,
+                    onAction = { viewModel.refresh() }
+                )
             } else {
                 // All processes view
                 Text(

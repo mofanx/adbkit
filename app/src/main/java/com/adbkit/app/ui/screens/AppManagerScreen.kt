@@ -28,6 +28,8 @@ import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.ui.components.ConfirmDialog
 import com.adbkit.app.ui.components.EmptyDevicePlaceholder
+import com.adbkit.app.ui.components.EmptyState
+import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.AppManagerViewModel
 import java.io.File
@@ -158,20 +160,17 @@ fun AppManagerScreen(
             }
 
             if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(strings.loadingAppList)
-                    }
-                }
+                LoadingState(message = strings.loadingAppList)
             } else if (uiState.error.isNotEmpty()) {
                 EmptyDevicePlaceholder(
                     onRetry = { viewModel.refresh() },
                     message = uiState.error
+                )
+            } else if (uiState.filteredPackages.isEmpty()) {
+                EmptyState(
+                    title = strings.noData,
+                    actionLabel = strings.refresh,
+                    onAction = { viewModel.refresh() }
                 )
             } else {
                 LazyColumn(
