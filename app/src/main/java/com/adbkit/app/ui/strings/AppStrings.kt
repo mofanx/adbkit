@@ -376,6 +376,10 @@ interface AppStrings {
     val uploadSuccess: String
     val downloadFailed: String
     val uploadFailed: String
+    val rename: String
+    val move: String
+    val newName: String
+    val targetPath: String
 
     // App management
     val installApk: String

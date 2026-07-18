@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +45,9 @@ fun FileManagerScreen(
 
     var pendingDelete by remember { mutableStateOf<String?>(null) }
     var pendingBatchDelete by remember { mutableStateOf(false) }
+    var pendingRename by remember { mutableStateOf<String?>(null) }
+    var pendingMove by remember { mutableStateOf<String?>(null) }
+    var pendingCopy by remember { mutableStateOf<String?>(null) }
 
     // File picker for upload
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -269,7 +271,10 @@ fun FileManagerScreen(
                                     viewModel.deleteFile(path)
                                 }
                             },
-                            onPull = { viewModel.pullFile(path, file["name"] ?: "") }
+                            onPull = { viewModel.pullFile(path, file["name"] ?: "") },
+                            onRename = { pendingRename = path },
+                            onMove = { pendingMove = path },
+                            onCopy = { pendingCopy = path }
                         )
                     }
 
@@ -318,6 +323,87 @@ fun FileManagerScreen(
                     pendingBatchDelete = false
                 },
                 onDismiss = { pendingBatchDelete = false }
+            )
+        }
+
+        // Rename dialog
+        if (pendingRename != null) {
+            var newName by remember { mutableStateOf(pendingRename?.substringAfterLast('/') ?: "") }
+            AlertDialog(
+                onDismissRequest = { pendingRename = null },
+                title = { Text(strings.rename) },
+                text = {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text(strings.newName) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingRename?.let { viewModel.renameFile(it, newName) }
+                        pendingRename = null
+                    }) { Text(strings.ok) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingRename = null }) { Text(strings.cancel) }
+                }
+            )
+        }
+
+        // Move dialog
+        if (pendingMove != null) {
+            var target by remember { mutableStateOf(pendingMove ?: "") }
+            AlertDialog(
+                onDismissRequest = { pendingMove = null },
+                title = { Text(strings.move) },
+                text = {
+                    OutlinedTextField(
+                        value = target,
+                        onValueChange = { target = it },
+                        label = { Text(strings.targetPath) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingMove?.let { viewModel.moveFile(it, target) }
+                        pendingMove = null
+                    }) { Text(strings.ok) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingMove = null }) { Text(strings.cancel) }
+                }
+            )
+        }
+
+        // Copy dialog
+        if (pendingCopy != null) {
+            var target by remember { mutableStateOf((pendingCopy ?: "") + "_copy") }
+            AlertDialog(
+                onDismissRequest = { pendingCopy = null },
+                title = { Text(strings.copy) },
+                text = {
+                    OutlinedTextField(
+                        value = target,
+                        onValueChange = { target = it },
+                        label = { Text(strings.targetPath) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingCopy?.let { viewModel.copyFile(it, target) }
+                        pendingCopy = null
+                    }) { Text(strings.ok) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingCopy = null }) { Text(strings.cancel) }
+                }
             )
         }
 
@@ -407,7 +493,10 @@ fun FileItemRow(
     onLongClick: () -> Unit = {},
     onSelect: () -> Unit = {},
     onDelete: () -> Unit,
-    onPull: () -> Unit
+    onPull: () -> Unit,
+    onRename: () -> Unit = {},
+    onMove: () -> Unit = {},
+    onCopy: () -> Unit = {}
 ) {
     val isDir = file["isDirectory"] == "true"
     val name = file["name"] ?: ""
@@ -494,6 +583,30 @@ fun FileItemRow(
                             leadingIcon = { Icon(Icons.Filled.Download, null) }
                         )
                     }
+                    DropdownMenuItem(
+                        text = { Text(LocalStrings.current.rename) },
+                        onClick = {
+                            showMenu = false
+                            onRename()
+                        },
+                        leadingIcon = { Icon(Icons.Filled.Edit, null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(LocalStrings.current.move) },
+                        onClick = {
+                            showMenu = false
+                            onMove()
+                        },
+                        leadingIcon = { @Suppress("DEPRECATION") Icon(Icons.Filled.DriveFileMove, null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(LocalStrings.current.copy) },
+                        onClick = {
+                            showMenu = false
+                            onCopy()
+                        },
+                        leadingIcon = { Icon(Icons.Filled.FileCopy, null) }
+                    )
                     DropdownMenuItem(
                         text = { Text(LocalStrings.current.delete) },
                         onClick = {

@@ -361,6 +361,10 @@ object ZhStrings : AppStrings {
     override val uploadSuccess = "上传成功"
     override val downloadFailed = "下载失败"
     override val uploadFailed = "上传失败"
+    override val rename = "重命名"
+    override val move = "移动"
+    override val newName = "新名称"
+    override val targetPath = "目标路径"
 
     // App management
     override val installApk = "安装 APK"

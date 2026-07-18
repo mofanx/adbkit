@@ -361,6 +361,10 @@ object EnStrings : AppStrings {
     override val uploadSuccess = "Upload successful"
     override val downloadFailed = "Download failed"
     override val uploadFailed = "Upload failed"
+    override val rename = "Rename"
+    override val move = "Move"
+    override val newName = "New name"
+    override val targetPath = "Target path"
 
     // App management
     override val installApk = "Install APK"

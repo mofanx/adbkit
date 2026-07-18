@@ -85,6 +85,45 @@ class FileManagerViewModel : ViewModel() {
         }
     }
 
+    fun renameFile(path: String, newName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = AdbService.renameFile(path, newName)
+            _uiState.update { it.copy(isLoading = false) }
+            if (result.success) {
+                loadFiles()
+            } else {
+                _uiState.update { it.copy(error = "Rename failed: ${result.error}") }
+            }
+        }
+    }
+
+    fun moveFile(path: String, destPath: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = AdbService.moveFile(path, destPath)
+            _uiState.update { it.copy(isLoading = false) }
+            if (result.success) {
+                loadFiles()
+            } else {
+                _uiState.update { it.copy(error = "Move failed: ${result.error}") }
+            }
+        }
+    }
+
+    fun copyFile(path: String, destPath: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = AdbService.copyFile(path, destPath)
+            _uiState.update { it.copy(isLoading = false) }
+            if (result.success) {
+                loadFiles()
+            } else {
+                _uiState.update { it.copy(error = "Copy failed: ${result.error}") }
+            }
+        }
+    }
+
     fun toggleFileSelection(path: String) {
         _uiState.update { state ->
             val current = state.selectedFiles

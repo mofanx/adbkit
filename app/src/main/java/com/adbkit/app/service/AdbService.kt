@@ -299,6 +299,20 @@ object AdbService {
         return shell("rm -rf ${shellQuote(path)}")
     }
 
+    suspend fun renameFile(oldPath: String, newName: String): CommandResult {
+        val parent = oldPath.substringBeforeLast("/").ifEmpty { "/" }
+        val newPath = "$parent/$newName"
+        return shell("mv ${shellQuote(oldPath)} ${shellQuote(newPath)}")
+    }
+
+    suspend fun moveFile(oldPath: String, newPath: String): CommandResult {
+        return shell("mv ${shellQuote(oldPath)} ${shellQuote(newPath)}")
+    }
+
+    suspend fun copyFile(sourcePath: String, destPath: String): CommandResult {
+        return shell("cp -R ${shellQuote(sourcePath)} ${shellQuote(destPath)}")
+    }
+
     suspend fun createDirectory(path: String): CommandResult {
         return shell("mkdir -p ${shellQuote(path)}")
     }
