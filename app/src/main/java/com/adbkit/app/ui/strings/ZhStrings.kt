@@ -233,6 +233,7 @@ object ZhStrings : AppStrings {
     override val pid = "PID"
     override val memory = "内存"
     override val processName = "进程名"
+    override val cpu = "CPU"
     override val killProcess = "结束进程"
 
     // Terminal

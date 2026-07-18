@@ -247,6 +247,7 @@ interface AppStrings {
     val pid: String
     val memory: String
     val processName: String
+    val cpu: String
     val killProcess: String
 
     // Terminal screen

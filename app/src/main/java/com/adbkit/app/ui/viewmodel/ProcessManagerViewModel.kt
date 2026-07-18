@@ -27,19 +27,38 @@ data class ProcessManagerUiState(
     val showSearch: Boolean = false,
     val statusMessage: String = "",
     val memoryInfo: MemoryInfo = MemoryInfo(),
-    val showAppsOnly: Boolean = true
+    val showAppsOnly: Boolean = true,
+    val sortMode: SortMode = SortMode.MEMORY,
+    val sortAscending: Boolean = false
 ) {
+    enum class SortMode { MEMORY, PID, NAME, CPU }
+
     val filteredProcesses: List<Map<String, String>>
-        get() = if (searchQuery.isEmpty()) processes
-        else processes.filter {
+        get() = sorted(if (searchQuery.isEmpty()) processes else processes.filter {
             (it["name"] ?: "").contains(searchQuery, ignoreCase = true) ||
             (it["pid"] ?: "").contains(searchQuery)
-        }
+        })
     val filteredApps: List<Map<String, String>>
-        get() = if (searchQuery.isEmpty()) runningApps
-        else runningApps.filter {
+        get() = sorted(if (searchQuery.isEmpty()) runningApps else runningApps.filter {
             (it["name"] ?: "").contains(searchQuery, ignoreCase = true)
+        })
+
+    private fun sorted(list: List<Map<String, String>>): List<Map<String, String>> {
+        val key = when (sortMode) {
+            SortMode.PID -> "pid"
+            SortMode.NAME -> "name"
+            SortMode.MEMORY -> "memory"
+            SortMode.CPU -> "cpu"
         }
+        val comparator = compareBy<Map<String, String>> {
+            when (sortMode) {
+                SortMode.PID -> (it[key] ?: "0").toLongOrNull() ?: 0L
+                SortMode.MEMORY, SortMode.CPU -> (it[key] ?: "0").replace("%", "").toDoubleOrNull() ?: 0.0
+                SortMode.NAME -> 0
+            }
+        }.thenBy { it["name"] ?: "" }
+        return if (sortAscending) list.sortedWith(comparator) else list.sortedWith(comparator.reversed())
+    }
 }
 
 class ProcessManagerViewModel : ViewModel() {
@@ -103,6 +122,15 @@ class ProcessManagerViewModel : ViewModel() {
 
     fun updateSearch(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun setSortMode(mode: ProcessManagerUiState.SortMode) {
+        _uiState.update {
+            it.copy(
+                sortMode = mode,
+                sortAscending = if (it.sortMode == mode) !it.sortAscending else false
+            )
+        }
     }
 
     fun killProcess(pid: String) {

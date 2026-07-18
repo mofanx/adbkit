@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.strings.LocalStrings
+import com.adbkit.app.ui.viewmodel.ProcessManagerUiState
 import com.adbkit.app.ui.viewmodel.ProcessManagerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +92,35 @@ fun ProcessManagerScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(28.dp)
                 )
+            }
+
+            // Sort chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val sortLabels = listOf(
+                    ProcessManagerUiState.SortMode.MEMORY to strings.memory,
+                    ProcessManagerUiState.SortMode.PID to strings.pid,
+                    ProcessManagerUiState.SortMode.NAME to strings.processName,
+                    ProcessManagerUiState.SortMode.CPU to strings.cpu
+                )
+                sortLabels.forEach { (mode, label) ->
+                    FilterChip(
+                        selected = uiState.sortMode == mode,
+                        onClick = { viewModel.setSortMode(mode) },
+                        label = { Text(label) }
+                    )
+                }
+                IconButton(onClick = { viewModel.setSortMode(uiState.sortMode) }) {
+                    Icon(
+                        imageVector = if (uiState.sortAscending) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                        contentDescription = if (uiState.sortAscending) "Ascending" else "Descending"
+                    )
+                }
             }
 
             // Memory overview card

@@ -233,6 +233,7 @@ object EnStrings : AppStrings {
     override val pid = "PID"
     override val memory = "Memory"
     override val processName = "Process"
+    override val cpu = "CPU"
     override val killProcess = "Kill Process"
 
     // Terminal
