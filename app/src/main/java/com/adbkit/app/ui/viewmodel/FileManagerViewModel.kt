@@ -290,6 +290,19 @@ class FileManagerViewModel : ViewModel() {
         _uiState.update { it.copy(preview = null) }
     }
 
+    fun installApk(path: String, fileName: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, statusMessage = "Installing $fileName...") }
+            val result = AdbService.installApp(path)
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    statusMessage = if (result.success) "Installed $fileName" else "Install failed: ${result.error}"
+                )
+            }
+        }
+    }
+
     fun createDirectory(name: String) {
         if (name.isBlank()) return
         viewModelScope.launch {

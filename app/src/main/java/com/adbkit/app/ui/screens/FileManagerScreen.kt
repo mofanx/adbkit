@@ -279,7 +279,8 @@ fun FileManagerScreen(
                             onRename = { pendingRename = path },
                             onMove = { pendingMove = path },
                             onCopy = { pendingCopy = path },
-                            onPreview = { viewModel.showPreview(path, file["name"] ?: "") }
+                            onPreview = { viewModel.showPreview(path, file["name"] ?: "") },
+                            onInstall = { viewModel.installApk(path, file["name"] ?: "") }
                         )
                     }
 
@@ -510,7 +511,8 @@ fun FileItemRow(
     onRename: () -> Unit = {},
     onMove: () -> Unit = {},
     onCopy: () -> Unit = {},
-    onPreview: () -> Unit = {}
+    onPreview: () -> Unit = {},
+    onInstall: () -> Unit = {}
 ) {
     val isDir = file["isDirectory"] == "true"
     val name = file["name"] ?: ""
@@ -596,6 +598,16 @@ fun FileItemRow(
                             },
                             leadingIcon = { Icon(Icons.Filled.Download, null) }
                         )
+                        if (name.endsWith(".apk", ignoreCase = true)) {
+                            DropdownMenuItem(
+                                text = { Text(LocalStrings.current.installApk) },
+                                onClick = {
+                                    showMenu = false
+                                    onInstall()
+                                },
+                                leadingIcon = { Icon(Icons.Filled.InstallMobile, null) }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(LocalStrings.current.preview) },
                             onClick = {
