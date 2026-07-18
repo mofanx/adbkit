@@ -3,11 +3,15 @@ package com.adbkit.app.service
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.adbkit.app.AdbKitApplication
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -16,7 +20,10 @@ object AdbService {
 
     private val _currentDevice = MutableStateFlow<String?>(null)
     val currentDevice: StateFlow<String?> = _currentDevice.asStateFlow()
-    
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var heartbeatJob: Job? = null
+
     private var adbPath: String = "adb"
     private var fastbootPath: String = "fastboot"
 
@@ -34,6 +41,20 @@ object AdbService {
 
     fun setCurrentDevice(address: String?) {
         _currentDevice.value = address
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+        if (address != null) {
+            heartbeatJob = serviceScope.launch {
+                while (true) {
+                    delay(5000)
+                    val result = shell("echo ok")
+                    if (!result.success) {
+                        _currentDevice.value = null
+                        break
+                    }
+                }
+            }
+        }
     }
 
     fun getCurrentDevice(): String? = _currentDevice.value
