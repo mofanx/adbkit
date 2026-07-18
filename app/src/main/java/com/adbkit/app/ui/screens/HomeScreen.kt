@@ -156,7 +156,12 @@ fun HomeScreen(
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(28.dp)
+                    shape = RoundedCornerShape(28.dp),
+                    supportingText = {
+                        if (uiState.localIp.isNotBlank()) {
+                            Text("${strings.localIp}: ${uiState.localIp}")
+                        }
+                    }
                 )
 
                 // History dropdown

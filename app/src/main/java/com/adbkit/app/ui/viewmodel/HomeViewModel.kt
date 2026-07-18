@@ -19,6 +19,7 @@ import java.net.NetworkInterface
 
 data class HomeUiState(
     val ipAddress: String = "",
+    val localIp: String = "",
     val connectedDevices: List<String> = emptyList(),
     val selectedDevice: String? = null,
     val isConnecting: Boolean = false,
@@ -46,6 +47,7 @@ class HomeViewModel : ViewModel() {
     init {
         refreshDevices()
         loadHistory()
+        _uiState.update { it.copy(localIp = getLocalIpAddress() ?: "") }
     }
 
     private fun loadHistory() {

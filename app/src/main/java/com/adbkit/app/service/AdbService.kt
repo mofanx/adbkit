@@ -170,6 +170,19 @@ object AdbService {
         return executeCommand("$adbPath connect $address")
     }
 
+    fun classifyConnectionError(result: CommandResult): String {
+        val output = (result.error + " " + result.output).lowercase()
+        return when {
+            result.success && result.output.contains("connected") -> "connected"
+            "connection refused" in output || "refused" in output -> "refused"
+            "no route to host" in output || "unreachable" in output || "timed out" in output || "timeout" in output -> "unreachable"
+            "offline" in output || "device offline" in output -> "offline"
+            "failed to authenticate" in output || "auth" in output || "unauthorized" in output -> "auth"
+            "cannot resolve" in output || "unknown host" in output || "no address" in output -> "invalid"
+            else -> "failed"
+        }
+    }
+
     suspend fun disconnect(address: String): CommandResult {
         return executeCommand("$adbPath disconnect $address")
     }

@@ -53,6 +53,7 @@ object EnStrings : AppStrings {
     override val wirelessPair = "Wireless Pairing"
     override val wirelessPairDesc = "Android 11+ supports wireless debugging pairing. Get pairing info from Settings > Developer Options > Wireless Debugging."
     override val ipAddress = "IP Address"
+    override val localIp = "Local IP"
     override val port = "Port"
     override val pairCode = "Pairing Code"
     override val restartingAdb = "Restarting ADB service..."

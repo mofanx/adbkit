@@ -57,6 +57,7 @@ interface AppStrings {
     val wirelessPair: String
     val wirelessPairDesc: String
     val ipAddress: String
+    val localIp: String
     val port: String
     val pairCode: String
     val restartingAdb: String

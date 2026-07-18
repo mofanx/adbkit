@@ -53,6 +53,7 @@ object ZhStrings : AppStrings {
     override val wirelessPair = "无线配对"
     override val wirelessPairDesc = "Android 11+ 支持无线调试配对。请在设备设置 > 开发者选项 > 无线调试中获取配对信息。"
     override val ipAddress = "IP地址"
+    override val localIp = "本机IP"
     override val port = "端口"
     override val pairCode = "配对码"
     override val restartingAdb = "正在重启 ADB 服务..."
