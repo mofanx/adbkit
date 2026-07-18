@@ -21,6 +21,7 @@ import com.adbkit.app.ui.viewmodel.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onMenuClick: () -> Unit,
+    onNavigateToHelp: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -269,6 +270,12 @@ fun SettingsScreen(
                 SettingsInfoRow(strings.aboutVersion, "1.1.0")
                 SettingsInfoRow(strings.aboutDeveloper, "ADB Kit Team")
                 SettingsInfoRow(strings.aboutRepo, "github.com/mofanx/adbkit")
+                OutlinedButton(
+                    onClick = onNavigateToHelp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(strings.help)
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

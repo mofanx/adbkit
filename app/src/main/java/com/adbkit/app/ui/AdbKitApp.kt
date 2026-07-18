@@ -154,6 +154,7 @@ private fun AdbKitContent() {
                     onMenuClick = {},
                     onNavigateToFastboot = { currentView = "fastboot" },
                     onNavigateToSettings = { currentView = "settings" },
+                    onNavigateToHelp = { currentView = "help" },
                     onDeviceClick = { device ->
                         scope.launch {
                             // Reset pager when switching to a different device
@@ -187,12 +188,20 @@ private fun AdbKitContent() {
                 )
             }
             "settings" -> {
-                SettingsScreen(onMenuClick = {
-                    currentView = if (currentDevice != null) "connected" else "home"
-                })
+                SettingsScreen(
+                    onMenuClick = {
+                        currentView = if (currentDevice != null) "connected" else "home"
+                    },
+                    onNavigateToHelp = { currentView = "help" }
+                )
             }
             "fastboot" -> {
                 FastbootScreen(onMenuClick = { currentView = "home" })
+            }
+            "help" -> {
+                HelpScreen(onBackClick = {
+                    currentView = if (currentDevice != null) "connected" else "home"
+                })
             }
         }
     }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Help
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ fun HomeScreen(
     onMenuClick: () -> Unit,
     onNavigateToFastboot: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
+    onNavigateToHelp: () -> Unit = {},
     onDeviceClick: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -72,6 +74,14 @@ fun HomeScreen(
                                     viewModel.disconnectAll()
                                 },
                                 leadingIcon = { Icon(Icons.Filled.LinkOff, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(strings.help) },
+                                onClick = {
+                                    viewModel.dismissMoreMenu()
+                                    onNavigateToHelp()
+                                },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Help, null) }
                             )
                         }
                     }

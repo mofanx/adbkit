@@ -392,6 +392,7 @@ interface AppStrings {
     val welcomeStep2: String
     val welcomeStep3: String
     val help: String
+    val helpContent: String
 
     // Device click target settings
     val deviceClickTarget: String
