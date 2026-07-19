@@ -370,6 +370,7 @@ object EnStrings : AppStrings {
     override val language = "Interface Language"
     override val chinese = "中文"
     override val english = "English"
+    override val languageSystem = "System"
     override val about = "About"
     override val aboutAppName = "App Name"
     override val aboutVersion = "Version"

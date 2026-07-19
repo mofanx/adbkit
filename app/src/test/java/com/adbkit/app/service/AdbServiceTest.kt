@@ -43,4 +43,17 @@ class AdbServiceTest {
         assertEquals("invalid", AdbService.classifyConnectionError(CommandResult(false, "", "cannot resolve host", 1)))
         assertEquals("failed", AdbService.classifyConnectionError(CommandResult(false, "", "some random error", 1)))
     }
+
+    @Test
+    fun `mapBatteryHealth returns expected labels`() {
+        assertEquals("UNKNOWN", AdbService.mapBatteryHealth(0))
+        assertEquals("UNKNOWN", AdbService.mapBatteryHealth(1))
+        assertEquals("GOOD", AdbService.mapBatteryHealth(2))
+        assertEquals("OVERHEAT", AdbService.mapBatteryHealth(3))
+        assertEquals("DEAD", AdbService.mapBatteryHealth(4))
+        assertEquals("OVER_VOLTAGE", AdbService.mapBatteryHealth(5))
+        assertEquals("UNSPECIFIED_FAILURE", AdbService.mapBatteryHealth(6))
+        assertEquals("COLD", AdbService.mapBatteryHealth(7))
+        assertEquals("UNKNOWN", AdbService.mapBatteryHealth(99))
+    }
 }

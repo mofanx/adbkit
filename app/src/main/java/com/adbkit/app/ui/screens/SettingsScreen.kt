@@ -265,6 +265,11 @@ fun SettingsScreen(
                     Text(text = strings.language, style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
+                            selected = uiState.language == "system",
+                            onClick = { viewModel.setLanguage("system") },
+                            label = { Text(strings.languageSystem) }
+                        )
+                        FilterChip(
                             selected = uiState.language == "zh",
                             onClick = { viewModel.setLanguage("zh") },
                             label = { Text(strings.chinese) }

@@ -370,6 +370,7 @@ object ZhStrings : AppStrings {
     override val language = "界面语言"
     override val chinese = "中文"
     override val english = "English"
+    override val languageSystem = "跟随系统"
     override val about = "关于"
     override val aboutAppName = "应用名称"
     override val aboutVersion = "版本"

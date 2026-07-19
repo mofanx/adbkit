@@ -1,6 +1,7 @@
 package com.adbkit.app.ui
 
 import android.widget.Toast
+import java.util.Locale
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -29,7 +30,14 @@ import kotlinx.coroutines.launch
 @Composable
 fun AdbKitApp(settingsViewModel: SettingsViewModel = viewModel()) {
     val settingsState by settingsViewModel.uiState.collectAsState()
-    val strings: AppStrings = if (settingsState.language == "en") EnStrings else ZhStrings
+    val strings: AppStrings = when (settingsState.language) {
+        "zh" -> ZhStrings
+        "en" -> EnStrings
+        else -> {
+            val systemLang = Locale.getDefault().language
+            if (systemLang == "zh") ZhStrings else EnStrings
+        }
+    }
 
     val darkTheme = when (settingsState.darkMode) {
         "dark" -> true

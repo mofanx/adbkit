@@ -384,6 +384,7 @@ interface AppStrings {
     val language: String
     val chinese: String
     val english: String
+    val languageSystem: String
     val about: String
     val aboutAppName: String
     val aboutVersion: String

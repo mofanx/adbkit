@@ -20,7 +20,7 @@ data class SettingsUiState(
     val keepScreenOn: Boolean = false,
     val confirmDangerous: Boolean = true,
     val saveHistory: Boolean = true,
-    val language: String = "zh",
+    val language: String = "system",
     val adbStatus: String = "",
     val isCheckingAdb: Boolean = false,
     val adbReady: Boolean = false,

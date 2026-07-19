@@ -48,7 +48,7 @@ class SettingsRepository(private val context: Context) {
         val raw = prefs[CONNECTION_HISTORY] ?: ""
         if (raw.isBlank()) emptyList() else raw.split(",").filter { it.isNotBlank() }
     }
-    val language: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "zh" }
+    val language: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "system" }
     val deviceClickTarget: Flow<String> = context.dataStore.data.map { it[DEVICE_CLICK_TARGET] ?: "device_info" }
     val onboardingShown: Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_SHOWN] ?: false }
     val commandHistory: Flow<List<String>> = context.dataStore.data.map { prefs ->

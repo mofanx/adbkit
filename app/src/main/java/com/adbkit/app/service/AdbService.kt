@@ -71,7 +71,7 @@ object AdbService {
      * Get HOME directory for ADB server.
      * ADB needs $HOME/.android for auth keys. The default /data is not writable.
      */
-    private fun mapBatteryHealth(health: Int): String {
+    internal fun mapBatteryHealth(health: Int): String {
         return when (health) {
             1 -> "UNKNOWN"
             2 -> "GOOD"
