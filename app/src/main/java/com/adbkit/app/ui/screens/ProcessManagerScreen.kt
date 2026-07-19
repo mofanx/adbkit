@@ -17,7 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.components.EmptyState
 import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
@@ -201,9 +200,10 @@ fun ProcessManagerScreen(
             if (uiState.isLoading) {
                 LoadingState(message = strings.loading)
             } else if (uiState.error.isNotEmpty()) {
-                EmptyDevicePlaceholder(
-                    onRetry = { viewModel.refresh() },
-                    message = uiState.error
+                EmptyState(
+                    title = uiState.error,
+                    actionLabel = strings.refresh,
+                    onAction = { viewModel.refresh() }
                 )
             } else if (uiState.showAppsOnly && uiState.filteredApps.isEmpty()) {
                 EmptyState(

@@ -30,7 +30,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.ui.components.ConfirmDialog
-import com.adbkit.app.ui.components.EmptyDevicePlaceholder
 import com.adbkit.app.ui.components.EmptyState
 import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
@@ -258,9 +257,10 @@ fun FileManagerScreen(
             if (uiState.isLoading) {
                 LoadingState(message = strings.loading)
             } else if (uiState.error.isNotEmpty()) {
-                EmptyDevicePlaceholder(
-                    onRetry = { viewModel.refresh() },
-                    message = uiState.error
+                EmptyState(
+                    title = uiState.error,
+                    actionLabel = strings.refresh,
+                    onAction = { viewModel.refresh() }
                 )
             } else if (uiState.files.isEmpty()) {
                 EmptyState(
