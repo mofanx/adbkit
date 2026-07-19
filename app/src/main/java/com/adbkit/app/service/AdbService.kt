@@ -495,6 +495,11 @@ object AdbService {
                     trimmed.startsWith("targetSdk=") -> info["target_sdk"] = trimmed.substringAfter("=")
                     trimmed.startsWith("minSdk=") -> info["min_sdk"] = trimmed.substringAfter("=")
                     trimmed.startsWith("installerPackageName=") -> info["installer"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("signatures:") || trimmed.startsWith("SigningInfo:") || trimmed.startsWith("signature") -> {
+                        if (info["signatures"].isNullOrBlank()) {
+                            info["signatures"] = "present"
+                        }
+                    }
                 }
             }
         }

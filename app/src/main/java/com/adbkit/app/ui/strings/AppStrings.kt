@@ -235,6 +235,7 @@ interface AppStrings {
     val adTargetSdk: String
     val adMinSdk: String
     val adInstaller: String
+    val adSignatures: String
 
     // File Manager screen
     val fileManager: String

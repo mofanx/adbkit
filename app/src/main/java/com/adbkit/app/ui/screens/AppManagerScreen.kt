@@ -352,7 +352,8 @@ fun AppDetailDialog(
         "data_dir" to strings.adDataDir,
         "target_sdk" to strings.adTargetSdk,
         "min_sdk" to strings.adMinSdk,
-        "installer" to strings.adInstaller
+        "installer" to strings.adInstaller,
+        "signatures" to strings.adSignatures
     )
     AlertDialog(
         onDismissRequest = onDismiss,

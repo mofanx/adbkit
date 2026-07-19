@@ -221,6 +221,7 @@ object EnStrings : AppStrings {
     override val adTargetSdk = "Target SDK"
     override val adMinSdk = "Min SDK"
     override val adInstaller = "Installer"
+    override val adSignatures = "Signatures"
 
     // File Manager
     override val fileManager = "File Manager"
