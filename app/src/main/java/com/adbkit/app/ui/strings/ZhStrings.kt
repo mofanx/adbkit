@@ -300,6 +300,7 @@ object ZhStrings : AppStrings {
     override val customCommand = "自定义命令"
     override val commandOutput = "命令行输出"
     override val saveLog = "保存日志"
+    override val runScript = "执行脚本"
     override val verifyMd5 = "校验 MD5"
     override val md5Result = "MD5: %s"
     override val md5Mismatch = "MD5 不匹配！期望 %s，实际 %s"

@@ -314,6 +314,7 @@ interface AppStrings {
     val customCommand: String
     val commandOutput: String
     val saveLog: String
+    val runScript: String
     val verifyMd5: String
     val md5Result: String
     val md5Mismatch: String

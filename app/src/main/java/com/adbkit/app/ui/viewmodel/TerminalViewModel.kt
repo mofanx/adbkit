@@ -181,6 +181,32 @@ class TerminalViewModel : ViewModel() {
         }
     }
 
+    fun runFavoritesScript() {
+        val favorites = _uiState.value.commandFavorites
+        if (favorites.isEmpty()) {
+            _uiState.update { it.copy(outputLines = it.outputLines + "No favorite commands to run") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExecuting = true, outputLines = it.outputLines + "--- Running favorite script (${favorites.size} commands) ---") }
+            favorites.forEach { cmd ->
+                val prefix = if (_uiState.value.isShellMode) "$ " else ">>> adb "
+                _uiState.update { it.copy(outputLines = it.outputLines + "$prefix$cmd") }
+                val result = try {
+                    if (_uiState.value.isShellMode) AdbService.shell(cmd) else AdbService.adb(cmd)
+                } catch (e: Exception) {
+                    CommandResult(false, "", e.message ?: "Error", -1)
+                }
+                val outLines = mutableListOf<String>()
+                if (result.output.isNotEmpty()) outLines.addAll(result.output.lines())
+                if (result.error.isNotEmpty()) outLines.addAll(result.error.lines().map { "ERR: $it" })
+                if (outLines.isEmpty()) outLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
+                _uiState.update { it.copy(outputLines = it.outputLines + outLines) }
+            }
+            _uiState.update { it.copy(isExecuting = false, outputLines = it.outputLines + "--- Script finished ---") }
+        }
+    }
+
     fun shareFavoritesScript(context: Context) {
         val favorites = _uiState.value.commandFavorites
         val script = buildString {
