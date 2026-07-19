@@ -410,6 +410,10 @@ interface AppStrings {
     val remoteControlGuideStep1: String
     val remoteControlGuideStep2: String
     val remoteControlGuideStep3: String
+    val crashLog: String
+    val noCrashLogs: String
+    val shareCrashLog: String
+    val clearCrashLogs: String
     val help: String
     val helpContent: String
 

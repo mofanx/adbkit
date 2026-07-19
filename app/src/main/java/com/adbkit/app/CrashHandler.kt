@@ -21,6 +21,28 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
         Thread.setDefaultUncaughtExceptionHandler(this)
     }
 
+    fun crashLogDir(): File = File(context.filesDir, "crashes")
+
+    fun listCrashLogs(): List<File> {
+        val dir = crashLogDir()
+        if (!dir.exists()) return emptyList()
+        return dir.listFiles { _, name -> name.endsWith(".log") }
+            ?.sortedByDescending { it.lastModified() } ?: emptyList()
+    }
+
+    fun latestCrashLog(): String? {
+        val file = listCrashLogs().firstOrNull() ?: return null
+        return try {
+            file.readText()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun clearCrashLogs() {
+        crashLogDir().listFiles()?.forEach { it.delete() }
+    }
+
     override fun uncaughtException(thread: Thread, throwable: Throwable) {
         try {
             val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())

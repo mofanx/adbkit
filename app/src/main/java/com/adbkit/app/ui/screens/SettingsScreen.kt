@@ -11,9 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.BuildConfig
+import com.adbkit.app.CrashHandler
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.SettingsViewModel
 
@@ -26,6 +29,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -267,7 +271,7 @@ fun SettingsScreen(
             // About section
             SettingsSection(title = strings.about) {
                 SettingsInfoRow(strings.aboutAppName, "ADB Kit")
-                SettingsInfoRow(strings.aboutVersion, "1.1.0")
+                SettingsInfoRow(strings.aboutVersion, BuildConfig.VERSION_NAME)
                 SettingsInfoRow(strings.aboutDeveloper, "ADB Kit Team")
                 SettingsInfoRow(strings.aboutRepo, "github.com/mofanx/adbkit")
                 OutlinedButton(
@@ -275,6 +279,42 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(strings.help)
+                }
+                val crashLogText = remember { CrashHandler.latestCrashLog() }
+                if (crashLogText != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, crashLogText)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(intent, strings.shareCrashLog))
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(strings.shareCrashLog)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                CrashHandler.clearCrashLogs()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(strings.clearCrashLogs)
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = strings.noCrashLogs,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
