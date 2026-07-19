@@ -21,6 +21,7 @@ object EnStrings : AppStrings {
     override val more = "More"
     override val copy = "Copy"
     override val share = "Share"
+    override val shareJson = "Share JSON"
     override val execute = "Execute"
     override val connect = "Connect"
     override val disconnect = "Disconnect"

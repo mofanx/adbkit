@@ -25,6 +25,7 @@ interface AppStrings {
     val more: String
     val copy: String
     val share: String
+    val shareJson: String
     val execute: String
     val connect: String
     val disconnect: String

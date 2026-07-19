@@ -46,17 +46,44 @@ fun DeviceInfoScreen(
                     IconButton(onClick = { viewModel.copyAll() }) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = strings.copyAll)
                     }
-                    IconButton(onClick = {
-                        val text = viewModel.buildShareText()
-                        if (text.isNotBlank()) {
-                            val intent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, text)
-                            }
-                            context.startActivity(Intent.createChooser(intent, strings.share))
+                    var shareMenuExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { shareMenuExpanded = true }) {
+                            Icon(Icons.Filled.Share, contentDescription = strings.share)
                         }
-                    }) {
-                        Icon(Icons.Filled.Share, contentDescription = strings.share)
+                        DropdownMenu(
+                            expanded = shareMenuExpanded,
+                            onDismissRequest = { shareMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(strings.share) },
+                                onClick = {
+                                    shareMenuExpanded = false
+                                    val text = viewModel.buildShareText()
+                                    if (text.isNotBlank()) {
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, text)
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, strings.share))
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(strings.shareJson) },
+                                onClick = {
+                                    shareMenuExpanded = false
+                                    val json = viewModel.buildShareJson()
+                                    if (json.isNotBlank()) {
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, json)
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, strings.shareJson))
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             )

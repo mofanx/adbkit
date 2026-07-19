@@ -21,6 +21,7 @@ object ZhStrings : AppStrings {
     override val more = "更多"
     override val copy = "复制"
     override val share = "分享"
+    override val shareJson = "分享 JSON"
     override val execute = "执行"
     override val connect = "连接"
     override val disconnect = "断开"

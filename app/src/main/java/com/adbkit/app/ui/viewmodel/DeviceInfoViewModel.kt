@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.service.AdbService
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -82,5 +83,11 @@ class DeviceInfoViewModel : ViewModel() {
         val info = _uiState.value.deviceInfo
         if (info.isEmpty()) return ""
         return info.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+    }
+
+    fun buildShareJson(): String {
+        val info = _uiState.value.deviceInfo
+        if (info.isEmpty()) return ""
+        return GsonBuilder().setPrettyPrinting().create().toJson(info)
     }
 }
