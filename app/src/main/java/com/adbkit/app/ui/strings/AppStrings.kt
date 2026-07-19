@@ -415,6 +415,7 @@ interface AppStrings {
     val noCrashLogs: String
     val shareCrashLog: String
     val clearCrashLogs: String
+    val feedback: String
     val help: String
     val helpContent: String
 

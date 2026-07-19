@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -279,6 +280,19 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(strings.help)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = android.net.Uri.parse("mailto:yanwuning@live.cn")
+                            putExtra(Intent.EXTRA_SUBJECT, "ADB Kit Feedback")
+                        }
+                        context.startActivity(Intent.createChooser(intent, strings.feedback))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(strings.feedback)
                 }
                 val crashLogText = remember { CrashHandler.latestCrashLog() }
                 if (crashLogText != null) {
