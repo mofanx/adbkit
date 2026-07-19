@@ -1,5 +1,6 @@
 package com.adbkit.app.ui.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
@@ -23,7 +24,8 @@ data class SettingsUiState(
     val adbStatus: String = "",
     val isCheckingAdb: Boolean = false,
     val adbReady: Boolean = false,
-    val adbDiagnostics: String = ""
+    val adbDiagnostics: String = "",
+    val dataStatus: String = ""
 )
 
 class SettingsViewModel : ViewModel() {
@@ -119,6 +121,20 @@ class SettingsViewModel : ViewModel() {
     fun showDiagnostics() {
         val diagnostics = AdbBinaryManager.getStatus(AdbKitApplication.instance)
         _uiState.update { it.copy(adbDiagnostics = diagnostics) }
+    }
+
+    fun exportSettings(uri: Uri) {
+        viewModelScope.launch {
+            val success = repo.exportSettings(uri)
+            _uiState.update { it.copy(dataStatus = if (success) "Settings exported" else "Export failed") }
+        }
+    }
+
+    fun importSettings(uri: Uri) {
+        viewModelScope.launch {
+            val success = repo.importSettings(uri)
+            _uiState.update { it.copy(dataStatus = if (success) "Settings imported" else "Import failed") }
+        }
     }
 
     fun autoDetectAdb() {

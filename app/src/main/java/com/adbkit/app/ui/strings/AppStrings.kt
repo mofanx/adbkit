@@ -381,6 +381,8 @@ interface AppStrings {
     val aboutVersion: String
     val aboutDeveloper: String
     val aboutRepo: String
+    val exportSettings: String
+    val importSettings: String
     // ADB status messages
     val adbStatusReady: String
     val adbStatusNotReady: String

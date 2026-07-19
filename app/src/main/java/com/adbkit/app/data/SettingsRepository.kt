@@ -1,10 +1,14 @@
 package com.adbkit.app.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -161,6 +165,52 @@ class SettingsRepository(private val context: Context) {
             val raw = prefs[COMMAND_FAVORITES] ?: ""
             val list = raw.split("\n").filter { it.isNotBlank() && it != command }
             prefs[COMMAND_FAVORITES] = list.joinToString("\n")
+        }
+    }
+
+    suspend fun exportSettings(uri: Uri): Boolean {
+        return try {
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                val prefs = context.dataStore.data.first()
+                val map = mutableMapOf<String, Any?>()
+                prefs.asMap().forEach { (key, value) -> map[key.name] = value }
+                val json = Gson().toJson(map)
+                out.write(json.toByteArray(Charsets.UTF_8))
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun importSettings(uri: Uri): Boolean {
+        return try {
+            val json = context.contentResolver.openInputStream(uri)?.use {
+                it.readBytes().toString(Charsets.UTF_8)
+            } ?: return false
+            val type = object : TypeToken<Map<String, Any?>>() {}.type
+            val map: Map<String, Any?> = Gson().fromJson(json, type) ?: return false
+            context.dataStore.edit { prefs ->
+                map.forEach { (name, value) ->
+                    when (value) {
+                        is Boolean -> prefs[booleanPreferencesKey(name)] = value
+                        is Int -> prefs[intPreferencesKey(name)] = value
+                        is Long -> prefs[longPreferencesKey(name)] = value
+                        is Float -> prefs[floatPreferencesKey(name)] = value
+                        is Double -> prefs[doublePreferencesKey(name)] = value
+                        is String -> prefs[stringPreferencesKey(name)] = value
+                        is Set<*> -> {
+                            @Suppress("UNCHECKED_CAST")
+                            if (value.all { it is String }) {
+                                prefs[stringSetPreferencesKey(name)] = value as Set<String>
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

@@ -367,6 +367,8 @@ object EnStrings : AppStrings {
     override val aboutVersion = "Version"
     override val aboutDeveloper = "Developer"
     override val aboutRepo = "Repository"
+    override val exportSettings = "Export Settings"
+    override val importSettings = "Import Settings"
     override val adbStatusReady = "ADB Ready"
     override val adbStatusNotReady = "ADB Not Ready - Binary not found"
     override val adbDiagnostics = "Diagnostics"

@@ -1,5 +1,7 @@
 package com.adbkit.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +33,13 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val strings = LocalStrings.current
     val context = LocalContext.current
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        uri?.let { viewModel.exportSettings(it) }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { viewModel.importSettings(it) }
+    }
 
     Scaffold(
         topBar = {
@@ -275,6 +284,35 @@ fun SettingsScreen(
                 SettingsInfoRow(strings.aboutVersion, BuildConfig.VERSION_NAME)
                 SettingsInfoRow(strings.aboutDeveloper, "ADB Kit Team")
                 SettingsInfoRow(strings.aboutRepo, "github.com/mofanx/adbkit")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { exportLauncher.launch("adbkit_settings.json") },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Upload, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(strings.exportSettings)
+                    }
+                    OutlinedButton(
+                        onClick = { importLauncher.launch(arrayOf("application/json")) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Download, null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(strings.importSettings)
+                    }
+                }
+                if (uiState.dataStatus.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = uiState.dataStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (uiState.dataStatus.startsWith("Settings")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                    )
+                }
                 OutlinedButton(
                     onClick = onNavigateToHelp,
                     modifier = Modifier.fillMaxWidth()
