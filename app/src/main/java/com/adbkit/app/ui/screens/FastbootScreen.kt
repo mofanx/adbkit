@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.ui.components.ConfirmDialog
+import com.adbkit.app.ui.components.GuideCard
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.FastbootViewModel
 import java.io.File
@@ -135,6 +136,17 @@ fun FastbootScreen(
                         else MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
+            }
+
+            if (!uiState.deviceDetected || uiState.permissionWarning.isNotEmpty()) {
+                GuideCard(
+                    title = strings.fastbootGuideTitle,
+                    steps = listOf(
+                        strings.fastbootGuideStep1,
+                        strings.fastbootGuideStep2,
+                        strings.fastbootGuideStep3
+                    )
+                )
             }
 
             // Flash image section

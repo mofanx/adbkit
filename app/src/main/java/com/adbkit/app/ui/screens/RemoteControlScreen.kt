@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.service.AdbService
+import com.adbkit.app.ui.components.GuideCard
 import com.adbkit.app.ui.strings.LocalStrings
 import com.adbkit.app.ui.viewmodel.RemoteControlViewModel
 
@@ -569,6 +570,17 @@ private fun SettingsView(
                         )
                     }
                 }
+            }
+
+            if (currentDevice == null) {
+                GuideCard(
+                    title = strings.remoteControlGuideTitle,
+                    steps = listOf(
+                        strings.remoteControlGuideStep1,
+                        strings.remoteControlGuideStep2,
+                        strings.remoteControlGuideStep3
+                    )
+                )
             }
 
             Card(

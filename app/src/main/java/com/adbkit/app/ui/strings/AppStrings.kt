@@ -402,6 +402,14 @@ interface AppStrings {
     val welcomeStep1: String
     val welcomeStep2: String
     val welcomeStep3: String
+    val fastbootGuideTitle: String
+    val fastbootGuideStep1: String
+    val fastbootGuideStep2: String
+    val fastbootGuideStep3: String
+    val remoteControlGuideTitle: String
+    val remoteControlGuideStep1: String
+    val remoteControlGuideStep2: String
+    val remoteControlGuideStep3: String
     val help: String
     val helpContent: String
 
