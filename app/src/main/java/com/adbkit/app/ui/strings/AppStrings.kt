@@ -341,6 +341,7 @@ interface AppStrings {
     val hidden: String
     val screenOffControl: String
     val audioTransmission: String
+    val audioNote: String
     val viewOnlyMode: String
     val weakNetworkMode: String
     val fpsLowWarning: String

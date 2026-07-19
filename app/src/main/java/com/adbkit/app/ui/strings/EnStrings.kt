@@ -327,6 +327,7 @@ object EnStrings : AppStrings {
     override val hidden = "Hidden"
     override val screenOffControl = "Screen Off Control"
     override val audioTransmission = "Audio Transmission"
+    override val audioNote = "Audio forwarding requires device-side support; currently reserved for future implementation."
     override val viewOnlyMode = "View Only Mode"
     override val weakNetworkMode = "Weak Network Mode"
     override val fpsLowWarning = "Low frame rate detected (%d fps). Lower bitrate/resolution for smoother control?"

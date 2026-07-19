@@ -327,6 +327,7 @@ object ZhStrings : AppStrings {
     override val hidden = "隐藏"
     override val screenOffControl = "熄屏控制"
     override val audioTransmission = "音频传输"
+    override val audioNote = "音频转发需要设备端支持，当前仅预留开关，后续版本实现。"
     override val viewOnlyMode = "仅观看模式"
     override val weakNetworkMode = "弱网模式"
     override val fpsLowWarning = "检测到帧率较低（%d fps），是否降低码率/分辨率以获得更流畅的控制？"

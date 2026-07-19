@@ -644,6 +644,12 @@ private fun SettingsView(
                         checked = uiState.audioEnabled,
                         onCheckedChange = { viewModel.setAudioEnabled(it) }
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = strings.audioNote,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                     ToggleRow(
