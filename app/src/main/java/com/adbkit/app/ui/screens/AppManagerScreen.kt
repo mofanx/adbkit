@@ -351,7 +351,8 @@ fun AppDetailDialog(
         "apk_path" to strings.adApkPath,
         "data_dir" to strings.adDataDir,
         "target_sdk" to strings.adTargetSdk,
-        "min_sdk" to strings.adMinSdk
+        "min_sdk" to strings.adMinSdk,
+        "installer" to strings.adInstaller
     )
     AlertDialog(
         onDismissRequest = onDismiss,

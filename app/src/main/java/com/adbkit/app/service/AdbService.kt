@@ -494,6 +494,7 @@ object AdbService {
                     trimmed.startsWith("dataDir=") -> info["data_dir"] = trimmed.substringAfter("=")
                     trimmed.startsWith("targetSdk=") -> info["target_sdk"] = trimmed.substringAfter("=")
                     trimmed.startsWith("minSdk=") -> info["min_sdk"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("installerPackageName=") -> info["installer"] = trimmed.substringAfter("=")
                 }
             }
         }

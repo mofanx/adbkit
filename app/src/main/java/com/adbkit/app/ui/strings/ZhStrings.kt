@@ -220,6 +220,7 @@ object ZhStrings : AppStrings {
     override val adDataDir = "数据目录"
     override val adTargetSdk = "目标SDK"
     override val adMinSdk = "最低SDK"
+    override val adInstaller = "安装来源"
 
     // File Manager
     override val fileManager = "文件管理"
