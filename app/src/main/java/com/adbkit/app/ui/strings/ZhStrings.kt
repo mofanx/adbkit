@@ -269,6 +269,7 @@ object ZhStrings : AppStrings {
     override val notConnected = "未连接"
     override val enterCommand = "输入命令..."
     override val history = "历史"
+    override val clearHistory = "清空历史"
     override val favorites = "收藏"
     override val addFavorite = "加入收藏"
     override val removeFavorite = "取消收藏"

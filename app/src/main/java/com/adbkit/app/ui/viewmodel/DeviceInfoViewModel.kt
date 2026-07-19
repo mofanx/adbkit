@@ -6,6 +6,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.DeviceHistoryRepository
+import com.adbkit.app.data.DeviceInfoSnapshot
 import com.adbkit.app.service.AdbService
 import com.google.gson.GsonBuilder
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,15 +28,26 @@ data class DeviceInfoUiState(
     val deviceInfo: Map<String, String> = emptyMap(),
     val isLoading: Boolean = false,
     val error: String = "",
-    val storageInfo: StorageInfo = StorageInfo()
+    val storageInfo: StorageInfo = StorageInfo(),
+    val history: List<DeviceInfoSnapshot> = emptyList(),
+    val showHistoryDialog: Boolean = false
 )
 
 class DeviceInfoViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(DeviceInfoUiState())
     val uiState: StateFlow<DeviceInfoUiState> = _uiState.asStateFlow()
+    private val historyRepo = DeviceHistoryRepository()
 
     init {
         refresh()
+        loadHistory()
+    }
+
+    private fun loadHistory() {
+        viewModelScope.launch {
+            val history = historyRepo.load()
+            _uiState.update { it.copy(history = history) }
+        }
     }
 
     fun refresh() {
@@ -48,9 +61,38 @@ class DeviceInfoViewModel : ViewModel() {
                 val info = AdbService.getDeviceInfo()
                 val storage = loadStorageInfo()
                 _uiState.update { it.copy(deviceInfo = info, isLoading = false, storageInfo = storage) }
+                saveSnapshot(info, storage)
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Failed to get info", isLoading = false) }
             }
+        }
+    }
+
+    private suspend fun saveSnapshot(info: Map<String, String>, storage: StorageInfo) {
+        val snapshot = DeviceInfoSnapshot(
+            batteryLevel = info["battery_level"] ?: "",
+            batteryTemp = info["battery_temp"] ?: "",
+            batteryStatus = info["battery_status"] ?: "",
+            totalStorage = storage.totalBytes,
+            usedStorage = storage.usedBytes,
+            availableStorage = storage.availableBytes
+        )
+        historyRepo.add(snapshot)
+        _uiState.update { it.copy(history = historyRepo.load()) }
+    }
+
+    fun showHistoryDialog() {
+        _uiState.update { it.copy(showHistoryDialog = true) }
+    }
+
+    fun hideHistoryDialog() {
+        _uiState.update { it.copy(showHistoryDialog = false) }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            historyRepo.clear()
+            _uiState.update { it.copy(history = emptyList()) }
         }
     }
 

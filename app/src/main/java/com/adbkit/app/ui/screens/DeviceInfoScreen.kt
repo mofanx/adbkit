@@ -43,6 +43,9 @@ fun DeviceInfoScreen(
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
                     }
+                    IconButton(onClick = { viewModel.showHistoryDialog() }) {
+                        Icon(Icons.Filled.History, contentDescription = strings.history)
+                    }
                     IconButton(onClick = { viewModel.copyAll() }) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = strings.copyAll)
                     }
@@ -249,6 +252,62 @@ fun DeviceInfoScreen(
                 }
             }
         }
+    }
+
+    if (uiState.showHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hideHistoryDialog() },
+            title = { Text(strings.history) },
+            text = {
+                if (uiState.history.isEmpty()) {
+                    Text(strings.noHistory, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        items(uiState.history) { snapshot ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = snapshot.timeText,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "${strings.diBatteryLevel}: ${snapshot.batteryLevel.ifEmpty { "N/A" }}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = "${strings.diBatteryTemperature}: ${snapshot.batteryTemp.ifEmpty { "N/A" }}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = "Storage: ${formatBytes(snapshot.usedStorage)} / ${formatBytes(snapshot.totalStorage)}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.hideHistoryDialog() }) {
+                    Text(strings.close)
+                }
+            },
+            dismissButton = {
+                if (uiState.history.isNotEmpty()) {
+                    TextButton(onClick = { viewModel.clearHistory() }) {
+                        Text(strings.clearHistory)
+                    }
+                }
+            }
+        )
     }
 }
 

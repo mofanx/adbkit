@@ -283,6 +283,7 @@ interface AppStrings {
     val notConnected: String
     val enterCommand: String
     val history: String
+    val clearHistory: String
     val favorites: String
     val addFavorite: String
     val removeFavorite: String

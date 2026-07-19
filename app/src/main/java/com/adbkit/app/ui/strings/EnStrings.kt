@@ -269,6 +269,7 @@ object EnStrings : AppStrings {
     override val notConnected = "Not connected"
     override val enterCommand = "Enter command..."
     override val history = "History"
+    override val clearHistory = "Clear History"
     override val favorites = "Favorites"
     override val addFavorite = "Add Favorite"
     override val removeFavorite = "Remove Favorite"
