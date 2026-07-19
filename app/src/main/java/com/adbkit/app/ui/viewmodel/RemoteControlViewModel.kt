@@ -87,7 +87,15 @@ class RemoteControlViewModel : ViewModel() {
     fun setBitrate(value: String) { _uiState.update { it.copy(bitrate = value) } }
     fun setKeepAspectRatio(value: Boolean) { _uiState.update { it.copy(keepAspectRatio = value) } }
     fun setNavBarStyle(value: String) { _uiState.update { it.copy(navBarStyle = value) } }
-    fun setScreenOff(value: Boolean) { _uiState.update { it.copy(screenOff = value) } }
+    fun setScreenOff(value: Boolean) {
+        _uiState.update { it.copy(screenOff = value) }
+        if (_uiState.value.isConnected) {
+            viewModelScope.launch {
+                val message = setDeviceScreenPower(!value)
+                _uiState.update { it.copy(statusMessage = message, isError = message.contains("failed")) }
+            }
+        }
+    }
     fun setAudioEnabled(value: Boolean) { _uiState.update { it.copy(audioEnabled = value) } }
     fun setViewOnly(value: Boolean) { _uiState.update { it.copy(viewOnly = value) } }
 
@@ -148,15 +156,14 @@ class RemoteControlViewModel : ViewModel() {
             val result = AdbService.shell("echo connected")
             if (result.success) {
                 loadScreenSize()
-                if (_uiState.value.screenOff) {
-                    // scrcpy-style screen off: turn off display without locking
+                val screenPowerMsg = if (_uiState.value.screenOff) {
                     setDeviceScreenPower(false)
-                }
+                } else ""
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
                         isConnected = true,
-                        statusMessage = "Remote control connected",
+                        statusMessage = if (screenPowerMsg.isBlank() || !screenPowerMsg.contains("failed")) "Remote control connected" else "Connected (${screenPowerMsg})",
                         isError = false
                     )
                 }
@@ -176,29 +183,42 @@ class RemoteControlViewModel : ViewModel() {
         val wasScreenOff = _uiState.value.screenOff
         stopStream()
         viewModelScope.launch {
-            if (wasScreenOff) {
-                // Restore screen on disconnect
+            val screenPowerMsg = if (wasScreenOff) {
                 setDeviceScreenPower(true)
+            } else ""
+            _uiState.update {
+                it.copy(statusMessage = if (screenPowerMsg.isBlank()) "Disconnected" else "Disconnected (${screenPowerMsg})", isError = screenPowerMsg.contains("failed"))
             }
         }
-        _uiState.update { it.copy(isConnected = false, statusMessage = "Disconnected") }
     }
 
     /**
      * scrcpy-style screen power control using SurfaceControl.setDisplayPowerMode.
      * Turns off the display without locking the device, saving battery.
+     * Returns a status message to show in the UI.
      */
-    private suspend fun setDeviceScreenPower(on: Boolean) {
-        // Use the same approach as scrcpy: call SurfaceControl.setDisplayPowerMode
-        // via shell command. Mode 0 = OFF, Mode 2 = ON
+    private suspend fun setDeviceScreenPower(on: Boolean): String {
         val mode = if (on) 2 else 0
-        // Try multiple approaches for compatibility
-        AdbService.shell(
-            "cmd display set-brightness 1 2>/dev/null; " +
-            "settings put system screen_brightness_mode 0 2>/dev/null; " +
-            "service call SurfaceFlinger 1035 i32 $mode 2>/dev/null; " +
-            if (!on) "input keyevent 26 2>/dev/null" else "input keyevent 224 2>/dev/null"
-        )
+        val commands = listOf(
+            "service call SurfaceFlinger 1035 i32 $mode 2>/dev/null",
+            "cmd display set-brightness ${if (on) "255" else "1"} 2>/dev/null",
+            "settings put system screen_brightness ${if (on) "200" else "1"} 2>/dev/null",
+            if (!on) "svc power goToSleep 2>/dev/null" else "input keyevent 224 2>/dev/null",
+            if (!on) "input keyevent 26 2>/dev/null" else ""
+        ).filter { it.isNotBlank() }
+
+        val failures = mutableListOf<String>()
+        commands.forEach { cmd ->
+            try {
+                val result = AdbService.shell(cmd)
+                if (result.success) {
+                    return "screen ${if (on) "on" else "off"} command sent"
+                }
+            } catch (e: Exception) {
+                failures.add(e.message ?: "exception")
+            }
+        }
+        return "screen power ${if (on) "on" else "off"} failed"
     }
 
     fun stopStream() {
