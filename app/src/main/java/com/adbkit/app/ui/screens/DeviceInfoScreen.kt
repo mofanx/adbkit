@@ -1,8 +1,11 @@
 package com.adbkit.app.ui.screens
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
 import androidx.compose.material.icons.Icons
@@ -11,10 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adbkit.app.data.DeviceInfoSnapshot
 import com.adbkit.app.ui.components.EmptyState
 import com.adbkit.app.ui.components.LoadingState
 import com.adbkit.app.ui.strings.LocalStrings
@@ -263,6 +268,12 @@ fun DeviceInfoScreen(
                     Text(strings.noHistory, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                        if (uiState.history.size > 1) {
+                            item {
+                                DeviceHistoryChart(uiState.history)
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
                         items(uiState.history) { snapshot ->
                             Card(
                                 modifier = Modifier
@@ -308,6 +319,99 @@ fun DeviceInfoScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun DeviceHistoryChart(history: List<DeviceInfoSnapshot>) {
+    val batteryColor = MaterialTheme.colorScheme.primary
+    val storageColor = MaterialTheme.colorScheme.tertiary
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .padding(8.dp)
+    ) {
+        val width = size.width
+        val height = size.height
+        val padding = 24.dp.toPx()
+        val chartWidth = width - padding * 2
+        val chartHeight = height - padding * 2
+
+        // Draw axes
+        drawLine(
+            color = textColor,
+            start = Offset(padding, padding),
+            end = Offset(padding, height - padding),
+            strokeWidth = 2f
+        )
+        drawLine(
+            color = textColor,
+            start = Offset(padding, height - padding),
+            end = Offset(width - padding, height - padding),
+            strokeWidth = 2f
+        )
+
+        val maxBattery = 100f
+
+        fun batteryPoint(index: Int, snapshot: DeviceInfoSnapshot): Offset {
+            val level = snapshot.batteryLevel.replace("%", "").toFloatOrNull() ?: 0f
+            val x = if (history.size > 1) {
+                padding + chartWidth * (index / (history.size - 1).toFloat())
+            } else padding + chartWidth / 2
+            val y = height - padding - chartHeight * (level / maxBattery)
+            return Offset(x, y)
+        }
+
+        fun storagePoint(index: Int, snapshot: DeviceInfoSnapshot): Offset {
+            val used = if (snapshot.totalStorage > 0) snapshot.usedStorage.toFloat() / snapshot.totalStorage else 0f
+            val x = if (history.size > 1) {
+                padding + chartWidth * (index / (history.size - 1).toFloat())
+            } else padding + chartWidth / 2
+            val y = height - padding - chartHeight * used
+            return Offset(x, y)
+        }
+
+        for (i in 0 until history.lastIndex) {
+            drawLine(
+                color = batteryColor,
+                start = batteryPoint(i, history[i]),
+                end = batteryPoint(i + 1, history[i + 1]),
+                strokeWidth = 3f
+            )
+            drawLine(
+                color = storageColor,
+                start = storagePoint(i, history[i]),
+                end = storagePoint(i + 1, history[i + 1]),
+                strokeWidth = 3f
+            )
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(batteryColor, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Battery", style = MaterialTheme.typography.bodySmall, color = textColor)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(12.dp)
+                    .background(storageColor, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Storage", style = MaterialTheme.typography.bodySmall, color = textColor)
+        }
     }
 }
 
