@@ -316,6 +316,10 @@ interface AppStrings {
     val commandOutput: String
     val saveLog: String
     val runScript: String
+    val macros: String
+    val macroName: String
+    val saveMacro: String
+    val noMacros: String
     val verifyMd5: String
     val md5Result: String
     val md5Mismatch: String

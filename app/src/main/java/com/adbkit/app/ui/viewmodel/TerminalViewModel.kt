@@ -7,6 +7,8 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.MacroRepository
+import com.adbkit.app.data.ScriptMacro
 import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.service.AdbService
 import com.adbkit.app.service.CommandResult
@@ -24,6 +26,9 @@ data class TerminalUiState(
     val isExecuting: Boolean = false,
     val commandHistory: List<String> = emptyList(),
     val commandFavorites: List<String> = emptyList(),
+    val macros: List<ScriptMacro> = emptyList(),
+    val showMacros: Boolean = false,
+    val macroName: String = "",
     val showHistory: Boolean = false,
     val showFavorites: Boolean = false,
     val searchQuery: String = "",
@@ -38,6 +43,7 @@ class TerminalViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(TerminalUiState(currentDevice = AdbService.getCurrentDevice()))
     val uiState: StateFlow<TerminalUiState> = _uiState.asStateFlow()
     private val repo = SettingsRepository(AdbKitApplication.instance)
+    private val macroRepo = MacroRepository()
     private var saveHistoryEnabled = true
     private var currentCommandJob: Job? = null
 
@@ -56,6 +62,13 @@ class TerminalViewModel : ViewModel() {
             repo.saveHistory.collect { saveHistory ->
                 saveHistoryEnabled = saveHistory
             }
+        }
+        loadMacros()
+    }
+
+    private fun loadMacros() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(macros = macroRepo.load()) }
         }
     }
 
@@ -89,6 +102,55 @@ class TerminalViewModel : ViewModel() {
 
     fun toggleFavorites() {
         _uiState.update { it.copy(showFavorites = !it.showFavorites, showHistory = false) }
+    }
+
+    fun toggleMacros() {
+        _uiState.update { it.copy(showMacros = !it.showMacros, showHistory = false, showFavorites = false) }
+    }
+
+    fun setMacroName(name: String) {
+        _uiState.update { it.copy(macroName = name) }
+    }
+
+    fun saveMacro(name: String, commands: List<String>) {
+        if (name.isBlank() || commands.isEmpty()) return
+        viewModelScope.launch {
+            macroRepo.save(ScriptMacro(name = name, commands = commands))
+            _uiState.update { it.copy(macros = macroRepo.load(), macroName = "") }
+        }
+    }
+
+    fun deleteMacro(id: String) {
+        viewModelScope.launch {
+            macroRepo.delete(id)
+            _uiState.update { it.copy(macros = macroRepo.load()) }
+        }
+    }
+
+    fun runMacro(macro: ScriptMacro) {
+        val commands = macro.commands
+        if (commands.isEmpty()) {
+            _uiState.update { it.copy(outputLines = it.outputLines + "Macro '${macro.name}' has no commands") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExecuting = true, outputLines = it.outputLines + "--- Running macro '${macro.name}' (${commands.size} commands) ---") }
+            commands.forEach { cmd ->
+                val prefix = if (_uiState.value.isShellMode) "$ " else ">>> adb "
+                _uiState.update { it.copy(outputLines = it.outputLines + "$prefix$cmd") }
+                val result = try {
+                    if (_uiState.value.isShellMode) AdbService.shell(cmd) else AdbService.adb(cmd)
+                } catch (e: Exception) {
+                    CommandResult(false, "", e.message ?: "Error", -1)
+                }
+                val outLines = mutableListOf<String>()
+                if (result.output.isNotEmpty()) outLines.addAll(result.output.lines())
+                if (result.error.isNotEmpty()) outLines.addAll(result.error.lines().map { "ERR: $it" })
+                if (outLines.isEmpty()) outLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
+                _uiState.update { it.copy(outputLines = it.outputLines + outLines) }
+            }
+            _uiState.update { it.copy(isExecuting = false, outputLines = it.outputLines + "--- Macro finished ---") }
+        }
     }
 
     fun addFavorite(command: String) {

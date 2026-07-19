@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +65,9 @@ fun TerminalScreen(
                     }
                     IconButton(onClick = { viewModel.shareFavoritesScript(context) }) {
                         Icon(Icons.Filled.Share, contentDescription = strings.share)
+                    }
+                    IconButton(onClick = { viewModel.toggleMacros() }) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = strings.macros)
                     }
                     IconButton(onClick = { viewModel.clearOutput() }) {
                         Icon(Icons.Filled.DeleteSweep, contentDescription = strings.clearScreen)
@@ -285,4 +290,102 @@ fun TerminalScreen(
             }
         }
     }
+
+    if (uiState.showMacros) {
+        MacroDialog(
+            macros = uiState.macros,
+            macroName = uiState.macroName,
+            favorites = uiState.commandFavorites,
+            onNameChange = { viewModel.setMacroName(it) },
+            onSave = { viewModel.saveMacro(it, uiState.commandFavorites) },
+            onRun = { viewModel.runMacro(it) },
+            onDelete = { viewModel.deleteMacro(it) },
+            onDismiss = { viewModel.toggleMacros() }
+        )
+    }
+}
+
+@Composable
+fun MacroDialog(
+    macros: List<com.adbkit.app.data.ScriptMacro>,
+    macroName: String,
+    favorites: List<String>,
+    onNameChange: (String) -> Unit,
+    onSave: (String) -> Unit,
+    onRun: (com.adbkit.app.data.ScriptMacro) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val strings = LocalStrings.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.macros) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (favorites.isNotEmpty()) {
+                    OutlinedTextField(
+                        value = macroName,
+                        onValueChange = onNameChange,
+                        label = { Text(strings.macroName) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { onSave(macroName) },
+                        enabled = macroName.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(strings.saveMacro)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (macros.isEmpty()) {
+                    Text(strings.noMacros, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
+                        items(macros) { macro ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = macro.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${macro.commands.size} commands",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    Row {
+                                        IconButton(onClick = { onRun(macro) }) {
+                                            Icon(Icons.Filled.PlayArrow, contentDescription = strings.runScript)
+                                        }
+                                        IconButton(onClick = { onDelete(macro.id) }) {
+                                            Icon(Icons.Filled.Delete, contentDescription = strings.delete)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(strings.close) }
+        }
+    )
 }
