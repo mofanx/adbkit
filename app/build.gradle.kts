@@ -161,6 +161,8 @@ afterEvaluate {
         if ((name.startsWith("merge") && name.endsWith("Assets")) ||
             name.contains("LintVital") ||
             name.contains("lintVital") ||
+            name.contains("LintAnalyze") ||
+            name.contains("lintAnalyze") ||
             (name.contains("Lint") && name.contains("Report"))
         ) {
             dependsOn("copyScreenServerDex")
