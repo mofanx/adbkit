@@ -323,6 +323,8 @@ interface AppStrings {
     val selectPartition: String
     val backupPartition: String
     val backupDestination: String
+    val restorePartition: String
+    val restoreImagePath: String
     val detectDevice: String
 
     // Remote Control screen

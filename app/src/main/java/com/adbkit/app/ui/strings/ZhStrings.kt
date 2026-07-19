@@ -309,6 +309,8 @@ object ZhStrings : AppStrings {
     override val selectPartition = "选择分区"
     override val backupPartition = "备份分区"
     override val backupDestination = "备份目标路径"
+    override val restorePartition = "还原分区"
+    override val restoreImagePath = "还原镜像路径"
     override val detectDevice = "检测设备"
 
     // Remote Control

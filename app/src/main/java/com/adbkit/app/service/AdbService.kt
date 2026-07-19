@@ -553,6 +553,18 @@ object AdbService {
         return shell(cmd)
     }
 
+    suspend fun restorePartition(partition: String, imagePath: String): CommandResult {
+        if (partition.isBlank() || imagePath.isBlank()) return CommandResult(false, "", "Partition or image path is empty", 1)
+        val root = hasRootAccess()
+        val dest = "/dev/block/bootdevice/by-name/${partition}"
+        val cmd = if (root) {
+            "su -c 'dd if=${shellQuote(imagePath)} of=${shellQuote(dest)} bs=4M status=none'"
+        } else {
+            "dd if=${shellQuote(imagePath)} of=${shellQuote(dest)} bs=4M status=none"
+        }
+        return shell(cmd)
+    }
+
     suspend fun installApp(apkPath: String): CommandResult {
         // Use pm install for device-side paths (after adb push)
         // Use adb install for host-side paths

@@ -334,6 +334,27 @@ fun FastbootScreen(
                         }
                         Text(strings.backupPartition)
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = uiState.restoreImagePath,
+                        onValueChange = { viewModel.setRestoreImagePath(it) },
+                        label = { Text(strings.restoreImagePath) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { viewModel.restoreSelectedPartition() },
+                        enabled = uiState.selectedBackupPartition.isNotBlank() && uiState.restoreImagePath.isNotBlank() && !uiState.isExecuting,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text(strings.restorePartition)
+                    }
                 }
             }
 

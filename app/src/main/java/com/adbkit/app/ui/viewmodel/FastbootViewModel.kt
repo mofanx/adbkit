@@ -21,6 +21,7 @@ data class FastbootUiState(
     val partitionList: List<String> = emptyList(),
     val selectedBackupPartition: String = "",
     val backupDestination: String = "/sdcard/adbkit_partition_backup",
+    val restoreImagePath: String = "",
     val output: String = "",
     val isExecuting: Boolean = false
 )
@@ -141,6 +142,26 @@ class FastbootViewModel : ViewModel() {
             _uiState.update { it.copy(isExecuting = true) }
             val result = AdbService.backupPartition(partition, _uiState.value.backupDestination)
             appendOutput(if (result.success) "Backup complete: ${result.output}" else "Backup failed: ${result.error}")
+            _uiState.update { it.copy(isExecuting = false) }
+        }
+    }
+
+    fun setRestoreImagePath(path: String) {
+        _uiState.update { it.copy(restoreImagePath = path) }
+    }
+
+    fun restoreSelectedPartition() {
+        val partition = _uiState.value.selectedBackupPartition
+        val imagePath = _uiState.value.restoreImagePath
+        if (partition.isBlank() || imagePath.isBlank()) {
+            appendOutput("Please select a partition and enter the device-side image path to restore")
+            return
+        }
+        viewModelScope.launch {
+            appendOutput("$ adb shell dd if=$imagePath of=/dev/block/bootdevice/by-name/$partition")
+            _uiState.update { it.copy(isExecuting = true) }
+            val result = AdbService.restorePartition(partition, imagePath)
+            appendOutput(if (result.success) "Restore complete: ${result.output}" else "Restore failed: ${result.error}")
             _uiState.update { it.copy(isExecuting = false) }
         }
     }

@@ -309,6 +309,8 @@ object EnStrings : AppStrings {
     override val selectPartition = "Select Partition"
     override val backupPartition = "Backup Partition"
     override val backupDestination = "Backup Destination"
+    override val restorePartition = "Restore Partition"
+    override val restoreImagePath = "Restore Image Path"
     override val detectDevice = "Detect Device"
 
     // Remote Control
