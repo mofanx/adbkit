@@ -433,7 +433,31 @@ fun AppDetailDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(LocalStrings.current.close) }
+            val context = LocalContext.current
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                TextButton(
+                    onClick = {
+                        val json = com.google.gson.Gson().toJson(
+                            mapOf(
+                                "packageName" to packageName,
+                                "details" to details,
+                                "permissions" to permissions,
+                                "components" to components
+                            )
+                        )
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "App details: $packageName")
+                            putExtra(android.content.Intent.EXTRA_TEXT, json)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, strings.share))
+                    }
+                ) { Text(strings.share) }
+                TextButton(onClick = onDismiss) { Text(strings.close) }
+            }
         }
     )
 }
