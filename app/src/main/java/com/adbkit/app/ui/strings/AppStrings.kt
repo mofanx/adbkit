@@ -317,6 +317,10 @@ interface AppStrings {
     val md5Result: String
     val md5Mismatch: String
     val expectedMd5: String
+    val partitionBackup: String
+    val selectPartition: String
+    val backupPartition: String
+    val backupDestination: String
     val detectDevice: String
 
     // Remote Control screen

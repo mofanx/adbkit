@@ -18,6 +18,9 @@ data class FastbootUiState(
     val customCommand: String = "",
     val expectedMd5: String = "",
     val imageMd5: String = "",
+    val partitionList: List<String> = emptyList(),
+    val selectedBackupPartition: String = "",
+    val backupDestination: String = "/sdcard/adbkit_partition_backup",
     val output: String = "",
     val isExecuting: Boolean = false
 )
@@ -99,6 +102,45 @@ class FastbootViewModel : ViewModel() {
             _uiState.update { it.copy(isExecuting = true) }
             val result = AdbService.saveOutputLog(log, "adbkit_fastboot_log.txt")
             appendOutput(if (result.success) "Log saved: ${result.output}" else "Save log failed: ${result.error}")
+            _uiState.update { it.copy(isExecuting = false) }
+        }
+    }
+
+    fun loadPartitions() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExecuting = true) }
+            val partitions = AdbService.listPartitions()
+            val first = partitions.firstOrNull() ?: ""
+            _uiState.update {
+                it.copy(
+                    partitionList = partitions,
+                    selectedBackupPartition = if (it.selectedBackupPartition.isEmpty()) first else it.selectedBackupPartition,
+                    isExecuting = false
+                )
+            }
+            appendOutput(if (partitions.isNotEmpty()) "Found ${partitions.size} partitions" else "No partitions found (root may be required)")
+        }
+    }
+
+    fun setBackupPartition(partition: String) {
+        _uiState.update { it.copy(selectedBackupPartition = partition) }
+    }
+
+    fun setBackupDestination(dest: String) {
+        _uiState.update { it.copy(backupDestination = dest) }
+    }
+
+    fun backupSelectedPartition() {
+        val partition = _uiState.value.selectedBackupPartition
+        if (partition.isBlank()) {
+            appendOutput("Please select or enter a partition name")
+            return
+        }
+        viewModelScope.launch {
+            appendOutput("$ adb shell dd if=/dev/block/bootdevice/by-name/$partition of=${_uiState.value.backupDestination}/${partition}.img")
+            _uiState.update { it.copy(isExecuting = true) }
+            val result = AdbService.backupPartition(partition, _uiState.value.backupDestination)
+            appendOutput(if (result.success) "Backup complete: ${result.output}" else "Backup failed: ${result.error}")
             _uiState.update { it.copy(isExecuting = false) }
         }
     }

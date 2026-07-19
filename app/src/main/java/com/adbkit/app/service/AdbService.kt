@@ -521,6 +521,33 @@ object AdbService {
         return CommandResult(success = true, output = "Backed up to $destDir", error = "", exitCode = 0)
     }
 
+    suspend fun listPartitions(): List<String> {
+        val root = hasRootAccess()
+        val cmd = if (root) {
+            "su -c 'ls -1 /dev/block/bootdevice/by-name'"
+        } else {
+            "ls -1 /dev/block/bootdevice/by-name"
+        }
+        val result = shell(cmd)
+        if (!result.success) return emptyList()
+        return result.output.lines().filter { it.isNotBlank() && !it.startsWith("/") }
+    }
+
+    suspend fun backupPartition(partition: String, destDir: String = "/sdcard/adbkit_partition_backup"): CommandResult {
+        if (partition.isBlank()) return CommandResult(false, "", "Partition name is empty", 1)
+        val root = hasRootAccess()
+        val src = "/dev/block/bootdevice/by-name/${partition}"
+        val out = "$destDir/${partition}.img"
+        val mkdir = shell("mkdir -p ${shellQuote(destDir)}")
+        if (!mkdir.success) return mkdir
+        val cmd = if (root) {
+            "su -c 'dd if=${shellQuote(src)} of=${shellQuote(out)} bs=4M status=none'"
+        } else {
+            "dd if=${shellQuote(src)} of=${shellQuote(out)} bs=4M status=none"
+        }
+        return shell(cmd)
+    }
+
     suspend fun installApp(apkPath: String): CommandResult {
         // Use pm install for device-side paths (after adb push)
         // Use adb install for host-side paths

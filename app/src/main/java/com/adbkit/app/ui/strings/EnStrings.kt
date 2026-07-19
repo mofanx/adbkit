@@ -303,6 +303,10 @@ object EnStrings : AppStrings {
     override val md5Result = "MD5: %s"
     override val md5Mismatch = "MD5 mismatch! Expected %s, got %s"
     override val expectedMd5 = "Expected MD5"
+    override val partitionBackup = "Partition Backup"
+    override val selectPartition = "Select Partition"
+    override val backupPartition = "Backup Partition"
+    override val backupDestination = "Backup Destination"
     override val detectDevice = "Detect Device"
 
     // Remote Control

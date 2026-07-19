@@ -256,6 +256,87 @@ fun FastbootScreen(
                 }
             }
 
+            // Partition backup section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        strings.partitionBackup,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        var backupExpanded by remember { mutableStateOf(false) }
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = uiState.selectedBackupPartition,
+                                onValueChange = { viewModel.setBackupPartition(it) },
+                                label = { Text(strings.selectPartition) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                trailingIcon = {
+                                    if (uiState.partitionList.isNotEmpty()) {
+                                        IconButton(onClick = { backupExpanded = true }) {
+                                            Icon(Icons.Filled.ArrowDropDown, null)
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenu(
+                                expanded = backupExpanded,
+                                onDismissRequest = { backupExpanded = false }
+                            ) {
+                                uiState.partitionList.forEach { partition ->
+                                    DropdownMenuItem(
+                                        text = { Text(partition) },
+                                        onClick = {
+                                            viewModel.setBackupPartition(partition)
+                                            backupExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        IconButton(onClick = { viewModel.loadPartitions() }) {
+                            Icon(Icons.Filled.Refresh, contentDescription = strings.refresh)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = uiState.backupDestination,
+                        onValueChange = { viewModel.setBackupDestination(it) },
+                        label = { Text(strings.backupDestination) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { viewModel.backupSelectedPartition() },
+                        enabled = uiState.selectedBackupPartition.isNotBlank() && !uiState.isExecuting,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (uiState.isExecuting && uiState.selectedBackupPartition.isNotBlank()) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(strings.backupPartition)
+                    }
+                }
+            }
+
             // Quick actions
             Card(
                 modifier = Modifier.fillMaxWidth(),

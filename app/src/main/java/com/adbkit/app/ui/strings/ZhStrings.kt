@@ -303,6 +303,10 @@ object ZhStrings : AppStrings {
     override val md5Result = "MD5: %s"
     override val md5Mismatch = "MD5 不匹配！期望 %s，实际 %s"
     override val expectedMd5 = "期望 MD5"
+    override val partitionBackup = "分区备份"
+    override val selectPartition = "选择分区"
+    override val backupPartition = "备份分区"
+    override val backupDestination = "备份目标路径"
     override val detectDevice = "检测设备"
 
     // Remote Control
