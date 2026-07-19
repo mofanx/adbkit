@@ -296,6 +296,11 @@ object ZhStrings : AppStrings {
     override val deviceVariables = "设备变量"
     override val customCommand = "自定义命令"
     override val commandOutput = "命令行输出"
+    override val saveLog = "保存日志"
+    override val verifyMd5 = "校验 MD5"
+    override val md5Result = "MD5: %s"
+    override val md5Mismatch = "MD5 不匹配！期望 %s，实际 %s"
+    override val expectedMd5 = "期望 MD5"
     override val detectDevice = "检测设备"
 
     // Remote Control

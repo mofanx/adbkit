@@ -168,6 +168,16 @@ fun FastbootScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    OutlinedTextField(
+                        value = uiState.expectedMd5,
+                        onValueChange = { viewModel.setExpectedMd5(it) },
+                        label = { Text(strings.expectedMd5) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     // Partition selector
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -198,6 +208,17 @@ fun FastbootScreen(
                             }
                         }
 
+                        OutlinedButton(
+                            onClick = { viewModel.verifyImageMd5() },
+                            enabled = uiState.imagePath.isNotBlank() && !uiState.isExecuting
+                        ) {
+                            if (uiState.isExecuting && uiState.imageMd5.isEmpty()) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(strings.verifyMd5)
+                        }
+
                         Button(
                             onClick = {
                                 runDangerous(
@@ -210,6 +231,15 @@ fun FastbootScreen(
                         ) {
                             Text(strings.flash)
                         }
+                    }
+
+                    if (uiState.imageMd5.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = strings.md5Result.format(uiState.imageMd5),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -348,8 +378,13 @@ fun FastbootScreen(
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
-                        IconButton(onClick = { viewModel.clearOutput() }) {
-                            Icon(Icons.Filled.DeleteSweep, strings.clear)
+                        Row {
+                            IconButton(onClick = { viewModel.saveFlashLog() }) {
+                                Icon(Icons.Filled.Save, strings.saveLog)
+                            }
+                            IconButton(onClick = { viewModel.clearOutput() }) {
+                                Icon(Icons.Filled.DeleteSweep, strings.clear)
+                            }
                         }
                     }
 

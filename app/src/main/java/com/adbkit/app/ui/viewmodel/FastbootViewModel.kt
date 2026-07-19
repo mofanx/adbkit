@@ -16,6 +16,8 @@ data class FastbootUiState(
     val imagePath: String = "",
     val selectedPartition: String = "recovery",
     val customCommand: String = "",
+    val expectedMd5: String = "",
+    val imageMd5: String = "",
     val output: String = "",
     val isExecuting: Boolean = false
 )
@@ -62,6 +64,43 @@ class FastbootViewModel : ViewModel() {
 
     fun setCustomCommand(cmd: String) {
         _uiState.update { it.copy(customCommand = cmd) }
+    }
+
+    fun setExpectedMd5(md5: String) {
+        _uiState.update { it.copy(expectedMd5 = md5.trim()) }
+    }
+
+    fun verifyImageMd5() {
+        val path = _uiState.value.imagePath
+        if (path.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExecuting = true) }
+            val result = AdbService.verifyImageMd5(path)
+            val computed = if (result.success) result.output.trim() else ""
+            val expected = _uiState.value.expectedMd5
+            val message = if (result.success) {
+                if (expected.isNotBlank() && !computed.equals(expected, ignoreCase = true)) {
+                    "MD5 mismatch! Expected $expected, got $computed"
+                } else {
+                    "MD5: $computed"
+                }
+            } else {
+                "MD5 verification failed: ${result.error}"
+            }
+            appendOutput(message)
+            _uiState.update { it.copy(imageMd5 = computed, isExecuting = false) }
+        }
+    }
+
+    fun saveFlashLog() {
+        val log = _uiState.value.output
+        if (log.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExecuting = true) }
+            val result = AdbService.saveOutputLog(log, "adbkit_fastboot_log.txt")
+            appendOutput(if (result.success) "Log saved: ${result.output}" else "Save log failed: ${result.error}")
+            _uiState.update { it.copy(isExecuting = false) }
+        }
     }
 
     fun flashImage() {

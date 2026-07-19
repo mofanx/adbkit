@@ -2,6 +2,7 @@ package com.adbkit.app.service
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Environment
 import com.adbkit.app.AdbKitApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -878,6 +879,39 @@ object AdbService {
             }
         } catch (e: Exception) {
             null
+        }
+    }
+
+    suspend fun verifyImageMd5(imagePath: String): CommandResult = withContext(Dispatchers.IO) {
+        try {
+            val file = File(imagePath)
+            if (!file.exists()) {
+                return@withContext CommandResult(false, "", "File not found: $imagePath", 1)
+            }
+            val digest = java.security.MessageDigest.getInstance("MD5")
+            java.io.FileInputStream(file).use { input ->
+                val buffer = ByteArray(8192)
+                var read: Int
+                while (input.read(buffer).also { read = it } > 0) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            val md5 = digest.digest().joinToString("") { "%02x".format(it) }
+            CommandResult(true, md5, "", 0)
+        } catch (e: Exception) {
+            CommandResult(false, "", "MD5 verification failed: ${e.message}", -1)
+        }
+    }
+
+    suspend fun saveOutputLog(output: String, fileName: String = "adbkit_fastboot_log.txt"): CommandResult = withContext(Dispatchers.IO) {
+        try {
+            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            downloadDir.mkdirs()
+            val file = File(downloadDir, fileName)
+            file.writeText(output)
+            CommandResult(true, file.absolutePath, "", 0)
+        } catch (e: Exception) {
+            CommandResult(false, "", "Save log failed: ${e.message}", -1)
         }
     }
 }

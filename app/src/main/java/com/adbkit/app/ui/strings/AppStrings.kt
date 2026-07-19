@@ -310,6 +310,11 @@ interface AppStrings {
     val deviceVariables: String
     val customCommand: String
     val commandOutput: String
+    val saveLog: String
+    val verifyMd5: String
+    val md5Result: String
+    val md5Mismatch: String
+    val expectedMd5: String
     val detectDevice: String
 
     // Remote Control screen

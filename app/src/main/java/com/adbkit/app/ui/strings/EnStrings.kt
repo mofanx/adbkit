@@ -296,6 +296,11 @@ object EnStrings : AppStrings {
     override val deviceVariables = "Device Variables"
     override val customCommand = "Custom Command"
     override val commandOutput = "Command Output"
+    override val saveLog = "Save Log"
+    override val verifyMd5 = "Verify MD5"
+    override val md5Result = "MD5: %s"
+    override val md5Mismatch = "MD5 mismatch! Expected %s, got %s"
+    override val expectedMd5 = "Expected MD5"
     override val detectDevice = "Detect Device"
 
     // Remote Control
