@@ -169,6 +169,18 @@ class TerminalViewModel : ViewModel() {
         executeCommand()
     }
 
+    fun saveOutput() {
+        viewModelScope.launch {
+            val text = _uiState.value.outputLines.joinToString("\n")
+            val result = AdbService.saveOutputLog(text, "adbkit_terminal_log.txt")
+            _uiState.update {
+                it.copy(
+                    outputLines = it.outputLines + if (result.success) "Output saved: ${result.output}" else "Save failed: ${result.error}"
+                )
+            }
+        }
+    }
+
     fun shareFavoritesScript(context: Context) {
         val favorites = _uiState.value.commandFavorites
         val script = buildString {

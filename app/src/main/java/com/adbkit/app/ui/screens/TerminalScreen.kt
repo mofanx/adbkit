@@ -55,6 +55,9 @@ fun TerminalScreen(
                     IconButton(onClick = { viewModel.copyAllOutput(context) }) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = strings.copy)
                     }
+                    IconButton(onClick = { viewModel.saveOutput() }) {
+                        Icon(Icons.Filled.Save, contentDescription = strings.saveLog)
+                    }
                     IconButton(onClick = { viewModel.shareFavoritesScript(context) }) {
                         Icon(Icons.Filled.Share, contentDescription = strings.share)
                     }
