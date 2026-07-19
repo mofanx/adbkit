@@ -2,6 +2,8 @@
 
 一款功能强大的 Android ADB 助手应用，支持通过 WiFi 或 USB 连接管理 Android 设备。
 
+完整使用说明请见 [docs/USER_GUIDE.md](docs/USER_GUIDE.md)，产品规划与评估请见 [docs/product-evaluation-and-roadmap.md](docs/product-evaluation-and-roadmap.md)。
+
 ## 功能特性
 
 ### 🔗 设备连接
