@@ -382,6 +382,7 @@ object EnStrings : AppStrings {
     override val adbNotFound = "✗ No ADB binary found"
 
     // History & Scan
+    override val recentConnections = "Recent Connections"
     override val noHistory = "No history"
     override val scanningLan = "Scanning LAN..."
     override val scanResult = { count: Int -> "Found $count device(s)" }

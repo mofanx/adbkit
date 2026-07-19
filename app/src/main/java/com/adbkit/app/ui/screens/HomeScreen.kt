@@ -3,6 +3,7 @@ package com.adbkit.app.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -234,6 +235,43 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            if (uiState.connectionHistory.isNotEmpty()) {
+                Text(
+                    text = strings.recentConnections,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(uiState.connectionHistory.take(8)) { address ->
+                        AssistChip(
+                            onClick = { viewModel.selectHistory(address) },
+                            label = { Text(address, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { viewModel.removeHistory(address) },
+                                    modifier = Modifier.size(18.dp)
+                                ) {
+                                    Icon(Icons.Filled.Close, contentDescription = strings.delete, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             if (uiState.connectedDevices.isEmpty() && !uiState.isConnecting) {
                 WelcomePlaceholder(

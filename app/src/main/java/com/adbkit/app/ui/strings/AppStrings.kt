@@ -397,6 +397,7 @@ interface AppStrings {
     val adbNotFound: String
 
     // History & Scan
+    val recentConnections: String
     val noHistory: String
     val scanningLan: String
     val scanResult: (Int) -> String

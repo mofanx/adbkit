@@ -382,6 +382,7 @@ object ZhStrings : AppStrings {
     override val adbNotFound = "✗ 未找到可用的adb"
 
     // History & Scan
+    override val recentConnections = "最近连接"
     override val noHistory = "暂无历史记录"
     override val scanningLan = "正在扫描局域网..."
     override val scanResult = { count: Int -> "发现 $count 个设备" }
