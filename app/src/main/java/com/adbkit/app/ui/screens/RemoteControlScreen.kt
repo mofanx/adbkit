@@ -247,7 +247,7 @@ private fun ScreenMirrorView(
             // FPS overlay (always shown in top-end)
             if (uiState.streamMode == "h264") {
                 Text(
-                    text = "${uiState.fps}fps H.264",
+                    text = strings.fpsOverlay(uiState.fps),
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 10.sp,
                     modifier = Modifier
@@ -256,6 +256,41 @@ private fun ScreenMirrorView(
                         .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
+            }
+
+            // FPS low warning with action
+            if (uiState.fpsLowWarning) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = strings.fpsLowWarning.replace("%d", uiState.fps.toString()),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(
+                                    onClick = { viewModel.applyWeakNetworkPreset() },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Text(strings.applyWeakNetwork)
+                                }
+                                TextButton(onClick = { viewModel.dismissFpsWarning() }) {
+                                    Text(strings.close)
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Floating nav bar (only in "floating" mode)
@@ -604,6 +639,28 @@ private fun SettingsView(
                         checked = uiState.viewOnly,
                         onCheckedChange = { viewModel.setViewOnly(it) }
                     )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    ToggleRow(
+                        label = strings.weakNetworkMode,
+                        checked = uiState.weakNetworkMode,
+                        onCheckedChange = { viewModel.setWeakNetworkMode(it) }
+                    )
+                    if (uiState.weakNetworkMode) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = strings.weakNetworkHint,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.applyWeakNetworkPreset() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(strings.applyWeakNetwork)
+                        }
+                    }
                 }
             }
 

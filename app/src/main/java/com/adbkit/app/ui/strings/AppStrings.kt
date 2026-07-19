@@ -326,6 +326,11 @@ interface AppStrings {
     val screenOffControl: String
     val audioTransmission: String
     val viewOnlyMode: String
+    val weakNetworkMode: String
+    val fpsLowWarning: String
+    val applyWeakNetwork: String
+    val weakNetworkApplied: String
+    val weakNetworkHint: String
     val pressBackAgainToExit: String
     val btnBack: String
     val btnHome: String

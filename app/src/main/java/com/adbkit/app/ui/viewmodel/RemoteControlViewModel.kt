@@ -22,6 +22,8 @@ data class RemoteControlUiState(
     val screenOff: Boolean = false,
     val audioEnabled: Boolean = false,
     val viewOnly: Boolean = false,
+    val weakNetworkMode: Boolean = false,
+    val fpsLowWarning: Boolean = false,
     val isConnecting: Boolean = false,
     val isConnected: Boolean = false,
     val statusMessage: String = "",
@@ -40,16 +42,23 @@ class RemoteControlViewModel : ViewModel() {
 
     val streamService = ScreenStreamService()
 
+    private var lowFpsFrames = 0
+
     init {
         loadScreenSize()
         viewModelScope.launch {
             streamService.state.collect { streamState ->
+                val fps = streamState.fps
+                val streaming = streamState.streamMode == "h264"
+                val low = streaming && fps in 1..15
+                if (low) lowFpsFrames++ else lowFpsFrames = 0
                 _uiState.update {
                     it.copy(
-                        fps = streamState.fps,
+                        fps = fps,
                         streamMode = streamState.streamMode,
                         videoWidth = streamState.videoWidth,
-                        videoHeight = streamState.videoHeight
+                        videoHeight = streamState.videoHeight,
+                        fpsLowWarning = lowFpsFrames >= 5
                     )
                 }
             }
@@ -81,6 +90,25 @@ class RemoteControlViewModel : ViewModel() {
     fun setScreenOff(value: Boolean) { _uiState.update { it.copy(screenOff = value) } }
     fun setAudioEnabled(value: Boolean) { _uiState.update { it.copy(audioEnabled = value) } }
     fun setViewOnly(value: Boolean) { _uiState.update { it.copy(viewOnly = value) } }
+
+    fun setWeakNetworkMode(enabled: Boolean) { _uiState.update { it.copy(weakNetworkMode = enabled) } }
+
+    fun applyWeakNetworkPreset() {
+        _uiState.update {
+            it.copy(
+                maxSize = "480",
+                bitrate = "2Mbps",
+                weakNetworkMode = true,
+                statusMessage = "Weak network preset applied. Restart stream to take effect.",
+                isError = false
+            )
+        }
+    }
+
+    fun dismissFpsWarning() {
+        lowFpsFrames = 0
+        _uiState.update { it.copy(fpsLowWarning = false) }
+    }
 
     private fun parseMaxSize(): Int = _uiState.value.maxSize.toIntOrNull() ?: 720
 
