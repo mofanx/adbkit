@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.Input
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -108,7 +110,7 @@ private fun ScreenMirrorView(
                     },
                     actions = {
                         IconButton(onClick = { showInputDialog = true }) {
-                            Icon(Icons.Filled.Input, contentDescription = strings.inputText)
+                            Icon(Icons.AutoMirrored.Filled.Input, contentDescription = strings.inputText)
                         }
                         IconButton(onClick = { showControls = false }) {
                             Icon(Icons.Filled.Fullscreen, contentDescription = strings.fullscreen)
@@ -378,7 +380,7 @@ private fun BottomNavBar(
                     DropdownMenuItem(
                         text = { Text(strings.disconnect, color = MaterialTheme.colorScheme.error) },
                         onClick = { onExit(); onDismissMore() },
-                        leadingIcon = { Icon(Icons.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
                     )
                 }
             }
@@ -469,7 +471,7 @@ private fun FloatingNavBar(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 IconButton(onClick = onExit, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
                 }
             }
         }

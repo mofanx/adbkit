@@ -32,6 +32,8 @@ data class FileManagerUiState(
     val showCreateDirDialog: Boolean = false,
     val statusMessage: String = "",
     val isTransferring: Boolean = false,
+    val transferBytes: Long = 0L,
+    val transferTotal: Long = 0L,
     val requestFilePick: Boolean = false,
     val hasRootAccess: Boolean = false,
     val selectedFiles: Set<String> = emptySet(),
@@ -181,15 +183,19 @@ class FileManagerViewModel : ViewModel() {
 
     fun pullFile(remotePath: String, fileName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isTransferring = true, statusMessage = "Downloading $fileName...") }
+            _uiState.update { it.copy(isTransferring = true, statusMessage = "Downloading $fileName...", transferBytes = 0L, transferTotal = 0L) }
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             downloadDir.mkdirs()
             val localPath = "${downloadDir.absolutePath}/$fileName"
-            val result = AdbService.pullFile(remotePath, localPath)
+            val result = AdbService.pullFileWithProgress(remotePath, localPath) { copied, total ->
+                _uiState.update { it.copy(transferBytes = copied, transferTotal = total) }
+            }
             val size = formatFileSize(java.io.File(localPath).length())
             _uiState.update {
                 it.copy(
                     isTransferring = false,
+                    transferBytes = 0L,
+                    transferTotal = 0L,
                     statusMessage = if (result.success) "Downloaded $fileName ($size) to $localPath" else "Download failed: ${result.error}"
                 )
             }
@@ -199,12 +205,16 @@ class FileManagerViewModel : ViewModel() {
     fun pushFile(localPath: String, fileName: String) {
         viewModelScope.launch {
             val size = formatFileSize(java.io.File(localPath).length())
-            _uiState.update { it.copy(isTransferring = true, statusMessage = "Uploading $fileName ($size)...") }
+            _uiState.update { it.copy(isTransferring = true, statusMessage = "Uploading $fileName ($size)...", transferBytes = 0L, transferTotal = 0L) }
             val remotePath = "${_uiState.value.currentPath}/$fileName"
-            val result = AdbService.pushFile(localPath, remotePath)
+            val result = AdbService.pushFileWithProgress(localPath, remotePath) { copied, total ->
+                _uiState.update { it.copy(transferBytes = copied, transferTotal = total) }
+            }
             _uiState.update {
                 it.copy(
                     isTransferring = false,
+                    transferBytes = 0L,
+                    transferTotal = 0L,
                     statusMessage = if (result.success) "Uploaded $fileName ($size)" else "Upload failed: ${result.error}"
                 )
             }
@@ -317,7 +327,7 @@ class FileManagerViewModel : ViewModel() {
         }
     }
 
-    private fun formatFileSize(bytes: Long): String {
+    fun formatFileSize(bytes: Long): String {
         if (bytes <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
         val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()

@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 
 object AdbService {
@@ -376,6 +378,72 @@ object AdbService {
 
     suspend fun pushFile(localPath: String, remotePath: String): CommandResult {
         return adb("push", shellQuote(localPath), shellQuote(remotePath))
+    }
+
+    private suspend fun getRemoteFileSize(remotePath: String): Long {
+        val q = shellQuote(remotePath)
+        val stat = shell("stat -c %s $q")
+        return stat.output.trim().toLongOrNull() ?: -1L
+    }
+
+    suspend fun pullFileWithProgress(
+        remotePath: String,
+        localPath: String,
+        onProgress: (copied: Long, total: Long) -> Unit
+    ): CommandResult = withContext(Dispatchers.IO) {
+        val total = getRemoteFileSize(remotePath)
+        if (total < 0) {
+            return@withContext pullFile(remotePath, localPath)
+        }
+        val file = File(localPath)
+        file.parentFile?.mkdirs()
+
+        val deferred = async { pullFile(remotePath, localPath) }
+        var lastBytes = 0L
+        val job = launch {
+            while (deferred.isActive) {
+                delay(200)
+                val bytes = file.length()
+                if (bytes > lastBytes || bytes >= total) {
+                    lastBytes = bytes
+                    onProgress(bytes, total)
+                }
+            }
+        }
+        val result = deferred.await()
+        job.cancel()
+        onProgress(file.length(), total)
+        result
+    }
+
+    suspend fun pushFileWithProgress(
+        localPath: String,
+        remotePath: String,
+        onProgress: (copied: Long, total: Long) -> Unit
+    ): CommandResult = withContext(Dispatchers.IO) {
+        val total = File(localPath).length()
+        if (total <= 0) {
+            return@withContext pushFile(localPath, remotePath)
+        }
+
+        val deferred = async { pushFile(localPath, remotePath) }
+        val q = shellQuote(remotePath)
+        var lastBytes = 0L
+        val job = launch {
+            while (deferred.isActive) {
+                delay(200)
+                val sizeResult = shell("stat -c %s $q")
+                val bytes = sizeResult.output.trim().toLongOrNull() ?: lastBytes
+                if (bytes > lastBytes || bytes >= total) {
+                    lastBytes = bytes
+                    onProgress(bytes.coerceAtMost(total), total)
+                }
+            }
+        }
+        val result = deferred.await()
+        job.cancel()
+        onProgress(total, total)
+        result
     }
 
     suspend fun deleteFile(path: String): CommandResult {
