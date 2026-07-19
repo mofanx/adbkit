@@ -31,6 +31,7 @@ class SettingsRepository(private val context: Context) {
         val COMMAND_FAVORITES = stringPreferencesKey("command_favorites")
         val LANGUAGE = stringPreferencesKey("language")
         val DEVICE_CLICK_TARGET = stringPreferencesKey("device_click_target")
+        val ONBOARDING_SHOWN = booleanPreferencesKey("onboarding_shown")
     }
 
     val adbPath: Flow<String> = context.dataStore.data.map { it[ADB_PATH] ?: "adb" }
@@ -49,6 +50,7 @@ class SettingsRepository(private val context: Context) {
     }
     val language: Flow<String> = context.dataStore.data.map { it[LANGUAGE] ?: "zh" }
     val deviceClickTarget: Flow<String> = context.dataStore.data.map { it[DEVICE_CLICK_TARGET] ?: "device_info" }
+    val onboardingShown: Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_SHOWN] ?: false }
     val commandHistory: Flow<List<String>> = context.dataStore.data.map { prefs ->
         val raw = prefs[COMMAND_HISTORY] ?: ""
         if (raw.isBlank()) emptyList() else raw.split("\n").filter { it.isNotBlank() }
@@ -123,6 +125,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setDeviceClickTarget(target: String) {
         context.dataStore.edit { it[DEVICE_CLICK_TARGET] = target }
+    }
+
+    suspend fun setOnboardingShown(shown: Boolean) {
+        context.dataStore.edit { it[ONBOARDING_SHOWN] = shown }
     }
 
     suspend fun setCommandHistory(history: List<String>) {

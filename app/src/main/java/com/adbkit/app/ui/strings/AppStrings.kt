@@ -436,6 +436,17 @@ interface AppStrings {
     val help: String
     val helpContent: String
 
+    // Onboarding
+    val onboardingTitle: String
+    val onboardingStep1Title: String
+    val onboardingStep1Body: String
+    val onboardingStep2Title: String
+    val onboardingStep2Body: String
+    val onboardingStep3Title: String
+    val onboardingStep3Body: String
+    val onboardingTip: String
+    val onboardingFinish: String
+
     // Device click target settings
     val deviceClickTarget: String
     val deviceClickTargetDesc: String

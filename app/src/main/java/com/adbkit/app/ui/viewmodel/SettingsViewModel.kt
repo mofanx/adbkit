@@ -25,7 +25,8 @@ data class SettingsUiState(
     val isCheckingAdb: Boolean = false,
     val adbReady: Boolean = false,
     val adbDiagnostics: String = "",
-    val dataStatus: String = ""
+    val dataStatus: String = "",
+    val onboardingShown: Boolean = true
 )
 
 class SettingsViewModel : ViewModel() {
@@ -46,6 +47,7 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch { repo.confirmDangerous.collect { v -> _uiState.update { it.copy(confirmDangerous = v) } } }
         viewModelScope.launch { repo.saveHistory.collect { v -> _uiState.update { it.copy(saveHistory = v) } } }
         viewModelScope.launch { repo.language.collect { v -> _uiState.update { it.copy(language = v) } } }
+        viewModelScope.launch { repo.onboardingShown.collect { v -> _uiState.update { it.copy(onboardingShown = v) } } }
     }
 
     fun setAdbPath(path: String) {
@@ -99,6 +101,11 @@ class SettingsViewModel : ViewModel() {
     fun setLanguage(lang: String) {
         _uiState.update { it.copy(language = lang) }
         viewModelScope.launch { repo.setLanguage(lang) }
+    }
+
+    fun setOnboardingShown(shown: Boolean) {
+        _uiState.update { it.copy(onboardingShown = shown) }
+        viewModelScope.launch { repo.setOnboardingShown(shown) }
     }
 
     fun checkAdbAvailability() {

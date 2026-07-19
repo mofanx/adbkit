@@ -1,6 +1,7 @@
 package com.adbkit.app
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -48,6 +49,9 @@ object CrashHandler : Thread.UncaughtExceptionHandler {
             val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
             val report = buildString {
                 appendLine("Crash report - $timestamp")
+                appendLine("App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
+                appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
                 appendLine("Thread: ${thread.name}")
                 appendLine("Exception: ${throwable.javaClass.name}")
                 appendLine("Message: ${throwable.message}")

@@ -19,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adbkit.app.ui.navigation.Screen
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.adbkit.app.ui.screens.*
+import com.adbkit.app.ui.components.OnboardingDialog
 import com.adbkit.app.ui.strings.*
 import com.adbkit.app.ui.theme.AdbKitTheme
 import com.adbkit.app.ui.viewmodel.SettingsViewModel
@@ -41,7 +42,10 @@ fun AdbKitApp(settingsViewModel: SettingsViewModel = viewModel()) {
         dynamicColor = settingsState.dynamicColor
     ) {
         CompositionLocalProvider(LocalStrings provides strings) {
-            AdbKitContent()
+            AdbKitContent(
+                settingsState = settingsState,
+                settingsViewModel = settingsViewModel
+            )
         }
     }
 }
@@ -66,7 +70,10 @@ private val pagerScreens = listOf(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AdbKitContent() {
+private fun AdbKitContent(
+    settingsState: com.adbkit.app.ui.viewmodel.SettingsUiState,
+    settingsViewModel: com.adbkit.app.ui.viewmodel.SettingsViewModel
+) {
     val strings = LocalStrings.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -128,6 +135,10 @@ private fun AdbKitContent() {
 
     // Only show drawer when connected
     val isConnectedView = currentView == "connected" && currentDevice != null
+
+    if (!settingsState.onboardingShown) {
+        OnboardingDialog(onFinish = { settingsViewModel.setOnboardingShown(true) })
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,

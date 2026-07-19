@@ -417,7 +417,16 @@ object ZhStrings : AppStrings {
     override val clearCrashLogs = "清空崩溃日志"
     override val feedback = "发送反馈"
     override val help = "帮助"
-    override val helpContent = "## 如何开启 USB 调试\n• 在目标设备上进入「设置 > 关于手机」，连续点击「版本号」7 次开启开发者选项。\n• 进入「设置 > 系统 > 开发者选项」，开启「USB 调试」。\n• 使用 USB 线连接设备，并在弹窗中允许此主机调试。\n\n## 如何开启无线调试\n• 确保两台设备连接同一 Wi-Fi。\n• Android 11+：进入开发者选项 > 无线调试，使用 IP/端口/配对码完成配对。\n• 在 ADB Kit 中输入 IP:端口，点击连接。\n\n## 为什么需要存储权限\n• ADB Kit 需从目标设备下载文件到本地，并管理缓存/图片等。\n• 若未授予「所有文件访问权限」，pull/push 和 APK 安装可能失败。\n\n## 常见连接错误\n• 连接被拒绝：请确认目标设备已开启 USB/无线调试并授权此主机。\n• 设备不可达：请检查 IP 地址，确认两台设备在同一网络。\n• 未授权：撤销「USB 调试授权」后重新插拔 USB 或重新配对。\n\n## 远程控制提示\n• 开始投屏前必须先连接设备。\n• 如果画面卡顿，可在设置中降低码率/分辨率。\n\n## Fastboot 注意事项\n• Fastboot 通常需要 USB 线连接。\n• 在手机端运行 Fastboot 可能需要 root 或直接 USB 设备访问权限；请按需授权。\n• 刷入错误镜像可能导致设备变砖，请仔细核对分区和镜像文件。\n\n## 仍有问题？\n• 可查看项目仓库中的 docs/product-evaluation-and-roadmap.md 获取更详细的说明与路线图。"
+    override val onboardingTitle = "欢迎使用 ADB Kit"
+    override val onboardingStep1Title = "连接设备"
+    override val onboardingStep1Body = "在目标设备上开启 USB 调试，通过 USB 连接；或使用无线调试，输入 IP:端口 即可连接。"
+    override val onboardingStep2Title = "授予权限"
+    override val onboardingStep2Body = "允许存储权限，以便 ADB Kit 拉取文件、安装 APK、保存日志和截图到本地。"
+    override val onboardingStep3Title = "探索功能"
+    override val onboardingStep3Body = "使用设备信息、文件管理、应用管理、进程管理、终端、远程控制与 Fastboot 等工具。"
+    override val onboardingTip = "提示：你可以随时在设置 > 帮助中再次查看本引导。"
+    override val onboardingFinish = "开始使用"
+    override val helpContent = "## 如何开启 USB 调试\n• 在目标设备上进入「设置 > 关于手机」，连续点击「版本号」7 次开启开发者选项。\n• 进入「设置 > 系统 > 开发者选项」，开启「USB 调试」。\n• 使用 USB 线连接设备，并在弹窗中允许此主机调试。\n\n## 如何开启无线调试\n• 确保两台设备连接同一 Wi-Fi。\n• Android 11+：进入开发者选项 > 无线调试，使用 IP/端口/配对码完成配对。\n• 在 ADB Kit 中输入 IP:端口，点击连接。\n\n## 为什么需要存储权限\n• ADB Kit 需从目标设备下载文件到本地，并管理缓存/图片等。\n• 若未授予「所有文件访问权限」，pull/push 和 APK 安装可能失败。\n\n## 主要功能\n• 设备信息：查看完整设备参数，导出 JSON，查看电池/存储历史趋势折线图。\n• 文件管理：浏览、上传、下载、重命名、复制、移动、预览文件并显示进度。\n• 应用管理：用户/系统应用分类，批量备份 APK，导出应用列表，查看详情。\n• 进程管理：监控运行进程，按 CPU/内存/PID 排序，结束进程。\n• 命令终端：执行 ADB/Shell 命令，收藏命令，保存命令宏并一键运行，分享输出。\n• 远程控制：类 scrcpy 投屏，支持触控、键盘输入与弱网预设。\n• Fastboot：分区备份/还原、镜像 MD5 校验。\n• 实用工具：截图、录屏、亮度、重启、系统属性 setprop 等。\n\n## 常见连接错误\n• 连接被拒绝：请确认目标设备已开启 USB/无线调试并授权此主机。\n• 设备不可达：请检查 IP 地址，确认两台设备在同一网络。\n• 未授权：撤销「USB 调试授权」后重新插拔 USB 或重新配对。\n\n## 远程控制提示\n• 开始投屏前必须先连接设备。\n• 如果画面卡顿，可在设置中降低码率/分辨率。\n• 音频转发需要设备端支持，当前仅预留开关。\n\n## Fastboot 注意事项\n• Fastboot 通常需要 USB 线连接。\n• 在手机端运行 Fastboot 可能需要 root 或直接 USB 设备访问权限；请按需授权。\n• 刷入错误镜像可能导致设备变砖，请仔细核对分区和镜像文件。\n\n## 仍有问题？\n• 可在 设置 > 反馈 中发送崩溃日志或建议。\n• 访问项目仓库中的 docs/product-evaluation-and-roadmap.md 查看完整路线图。"
 
     // Device click target
     override val deviceClickTarget = "设备点击跳转"
