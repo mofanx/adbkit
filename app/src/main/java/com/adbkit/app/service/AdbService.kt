@@ -91,7 +91,7 @@ object AdbService {
     /**
      * Escape an argument for the device shell to avoid injection or quoting errors.
      */
-    private fun shellQuote(s: String): String {
+    internal fun shellQuote(s: String): String {
         return "'${s.replace("'", "'\\''")}'"
     }
 
