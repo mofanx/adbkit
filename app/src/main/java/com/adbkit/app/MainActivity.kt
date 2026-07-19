@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
+    @android.annotation.TargetApi(android.os.Build.VERSION_CODES.R)
     private fun launchManageAllFilesIntent() {
         try {
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {

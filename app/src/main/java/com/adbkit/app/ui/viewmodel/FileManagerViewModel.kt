@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 enum class FilePreviewType { TEXT, IMAGE, UNSUPPORTED }
 
@@ -332,6 +333,6 @@ class FileManagerViewModel : ViewModel() {
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
         val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
         val idx = digitGroups.coerceIn(0, units.size - 1)
-        return String.format("%.1f %s", bytes / Math.pow(1024.0, idx.toDouble()), units[idx])
+        return String.format(Locale.getDefault(), "%.1f %s", bytes / Math.pow(1024.0, idx.toDouble()), units[idx])
     }
 }
