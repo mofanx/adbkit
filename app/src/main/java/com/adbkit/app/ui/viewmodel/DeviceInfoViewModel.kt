@@ -33,7 +33,7 @@ data class DeviceInfoUiState(
     val showHistoryDialog: Boolean = false
 )
 
-class DeviceInfoViewModel : ViewModel() {
+class DeviceInfoViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(DeviceInfoUiState())
     val uiState: StateFlow<DeviceInfoUiState> = _uiState.asStateFlow()
     private val historyRepo = DeviceHistoryRepository()
@@ -52,7 +52,7 @@ class DeviceInfoViewModel : ViewModel() {
 
     fun refresh() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
+            _uiState.update { it.copy(error = strings.noDeviceConnected, isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -63,7 +63,7 @@ class DeviceInfoViewModel : ViewModel() {
                 _uiState.update { it.copy(deviceInfo = info, isLoading = false, storageInfo = storage) }
                 saveSnapshot(info, storage)
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to get info", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: strings.failedToGetInfo, isLoading = false) }
             }
         }
     }

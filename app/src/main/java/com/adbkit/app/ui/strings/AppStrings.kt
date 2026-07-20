@@ -379,6 +379,121 @@ interface AppStrings {
     val screenOnFailed: String
     val disconnected: String
 
+    // Common status/error messages
+    val loadFailed: String
+    val failedToGetInfo: String
+    val unableToReadProcessDetails: String
+    val textSent: String
+    val inputFailed: (String) -> String
+    val keyEventFailed: (String) -> String
+    val brightnessSet: (Int) -> String
+    val screenTimeoutSet: String
+    val setFailed: (String) -> String
+    val on: String
+    val off: String
+    val shown: String
+    val settingsExported: String
+    val settingsImported: String
+    val settingsExportFailed: String
+    val settingsImportFailed: String
+    val outputSaved: (String) -> String
+    val saveFailed: (String) -> String
+    val noFavoriteCommands: String
+    val runningFavorites: (Int) -> String
+    val scriptFinished: String
+    val macroEmpty: (String) -> String
+    val runningMacro: (String, Int) -> String
+    val macroFinished: String
+    val outputCleared: String
+    val okNoOutput: String
+    val failed: String
+    val cancelled: String
+    val md5MismatchDetail: (String, String) -> String
+    val md5Value: (String) -> String
+    val md5VerifyFailed: (String) -> String
+    val logSaved: (String) -> String
+    val saveLogFailed: (String) -> String
+    val partitionsFound: (Int) -> String
+    val noPartitionsFound: String
+    val selectPartitionPrompt: String
+    val selectPartitionAndImage: String
+    val partitionBackupComplete: (String) -> String
+    val partitionBackupFailed: (String) -> String
+    val partitionRestoreComplete: (String) -> String
+    val partitionRestoreFailed: (String) -> String
+    val errorPrefix: (String) -> String
+    val toggleState: (String, String) -> String
+    val urlOpened: String
+    val openUrlFailed: (String) -> String
+    val currentActivityFailed: (String) -> String
+    val logCleared: String
+    val settingProperty: (String) -> String
+    val propertySet: (String) -> String
+    val densityChanged: String
+    val resolutionChanged: String
+    val changeFailed: (String) -> String
+    val operationFailed: (String) -> String
+    val killFailed: (String) -> String
+    val stoppingApp: (String) -> String
+    val appStopped: (String) -> String
+    val stopFailed: (String) -> String
+    val connecting: String
+    val disconnectedFrom: (String) -> String
+    val cannotGetLocalIp: String
+    val pairingInProgress: String
+    val deleteFailed: (String) -> String
+    val renameFailed: (String) -> String
+    val moveFailed: (String) -> String
+    val copyFailed: (String) -> String
+    val uploadFailedFmt: (String) -> String
+    val downloadFailedFmt: (String) -> String
+    val createFailed: (String) -> String
+    val batchDeleteFailed: (Int, String) -> String
+    val deletedItems: (Int) -> String
+    val downloadedFile: (String, String, String) -> String
+    val uploadedFile: (String, String) -> String
+    val unsupportedFileType: String
+    val noAppsToBackup: String
+    val backingUpApp: (String) -> String
+    val backingUpApps: (Int) -> String
+    val backupComplete: (Int, Int, String) -> String
+    val backedUpTo: (String) -> String
+    val backupFailed: (String) -> String
+    val appEnabled: (String) -> String
+    val enableFailed: (String) -> String
+    val appDisabled: (String) -> String
+    val disableFailed: (String) -> String
+    val appLaunched: (String) -> String
+    val launchFailed: (String) -> String
+    val appUninstalled: (String) -> String
+    val uninstallFailed: (String) -> String
+    val appDataCleared: (String) -> String
+    val clearDataFailed: (String) -> String
+    val appForceStopped: (String) -> String
+    val forceStopFailed: (String) -> String
+    val installFailedFmt: (String) -> String
+    val pushFailed: (String) -> String
+    val exportingAppList: String
+    val appListExported: (String) -> String
+    val exportFailed: (String) -> String
+    val downloadingFile: (String) -> String
+    val uploadingFile: (String, String) -> String
+    val previewFailed: (String) -> String
+    val installingFile: (String) -> String
+    val installedFile: (String) -> String
+    val takingScreenshot: String
+    val screenshotSaved: (String) -> String
+    val screenshotFailed: (String) -> String
+    val recording: String
+    val recordingFile: (String) -> String
+    val recordingSaved: (String) -> String
+    val recordingStopped: String
+    val recordFailed: (String) -> String
+    val rebooting: String
+    val rebootCommandSent: String
+    val rebootFailed: (String) -> String
+    val pleaseSelectApk: String
+
     // Settings screen
     val adbConfig: String
     val adbPath: String

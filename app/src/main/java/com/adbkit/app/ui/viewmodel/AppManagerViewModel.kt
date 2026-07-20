@@ -41,7 +41,7 @@ data class AppManagerUiState(
         }
 }
 
-class AppManagerViewModel : ViewModel() {
+class AppManagerViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(AppManagerUiState())
     val uiState: StateFlow<AppManagerUiState> = _uiState.asStateFlow()
 
@@ -51,7 +51,7 @@ class AppManagerViewModel : ViewModel() {
 
     fun refresh() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
+            _uiState.update { it.copy(error = strings.noDeviceConnected, isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -63,7 +63,7 @@ class AppManagerViewModel : ViewModel() {
                     it.copy(userPackages = userApps, systemPackages = sysApps, isLoading = false)
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: strings.loadFailed, isLoading = false) }
             }
         }
     }
@@ -84,7 +84,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.forceStopApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg force stopped" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.appForceStopped(pkg) else strings.forceStopFailed(result.error))
             }
         }
     }
@@ -94,9 +94,9 @@ class AppManagerViewModel : ViewModel() {
             val result = AdbService.uninstallApp(pkg)
             if (result.success) {
                 refresh()
-                _uiState.update { it.copy(statusMessage = "$pkg uninstalled") }
+                _uiState.update { it.copy(statusMessage = strings.appUninstalled(pkg)) }
             } else {
-                _uiState.update { it.copy(statusMessage = "Uninstall failed: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = strings.uninstallFailed(result.error)) }
             }
         }
     }
@@ -105,7 +105,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.clearAppData(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg data cleared" else "Clear failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.appDataCleared(pkg) else strings.clearDataFailed(result.error))
             }
         }
     }
@@ -114,7 +114,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.disableApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg disabled" else "Disable failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.appDisabled(pkg) else strings.disableFailed(result.error))
             }
         }
     }
@@ -123,17 +123,19 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.enableApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg enabled" else "Enable failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.appEnabled(pkg) else strings.enableFailed(result.error))
             }
         }
     }
 
     fun backup(pkg: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Backing up $pkg...") }
-            val result = AdbService.backupApp(pkg, "/sdcard/Download/${pkg}.apk")
+            _uiState.update { it.copy(statusMessage = strings.backingUpApp(pkg)) }
+            val root = AdbService.getDeviceExternalStorageRoot()
+            val savePath = "$root/Download/${pkg}.apk"
+            val result = AdbService.backupApp(pkg, savePath)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Backed up to /sdcard/Download/${pkg}.apk" else "Backup failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.backedUpTo(savePath) else strings.backupFailed(result.error))
             }
         }
     }
@@ -142,7 +144,7 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.launchApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "$pkg launched" else "Launch failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.appLaunched(pkg) else strings.launchFailed(result.error))
             }
         }
     }
@@ -185,13 +187,13 @@ class AppManagerViewModel : ViewModel() {
 
     fun installApk(localPath: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isInstalling = true, statusMessage = "Installing...") }
+            _uiState.update { it.copy(isInstalling = true, statusMessage = strings.installing) }
             // Push APK to device temp, then install
             val remotePath = "/data/local/tmp/install_temp.apk"
             val pushResult = AdbService.pushFile(localPath, remotePath)
             if (!pushResult.success) {
                 File(localPath).delete()
-                _uiState.update { it.copy(isInstalling = false, statusMessage = "Push failed: ${pushResult.error}") }
+                _uiState.update { it.copy(isInstalling = false, statusMessage = strings.pushFailed(pushResult.error)) }
                 return@launch
             }
             val installResult = AdbService.installApp(remotePath)
@@ -201,7 +203,7 @@ class AppManagerViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     isInstalling = false,
-                    statusMessage = if (installResult.success) "Install successful" else "Install failed: ${installResult.error}"
+                    statusMessage = if (installResult.success) strings.installSuccess else strings.installFailedFmt(installResult.error)
                 )
             }
             if (installResult.success) refresh()
@@ -212,13 +214,13 @@ class AppManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val packages = _uiState.value.filteredPackages
             if (packages.isEmpty()) {
-                _uiState.update { it.copy(statusMessage = "No apps to backup") }
+                _uiState.update { it.copy(statusMessage = strings.noAppsToBackup) }
                 return@launch
             }
-            _uiState.update { it.copy(isLoading = true, statusMessage = "Backing up ${packages.size} app(s)...") }
+            _uiState.update { it.copy(isLoading = true, statusMessage = strings.backingUpApps(packages.size)) }
             var successCount = 0
             var failedCount = 0
-            val destDir = "/sdcard/app_backup_adbkit"
+            val destDir = "${AdbService.getDeviceExternalStorageRoot()}/app_backup_adbkit"
             packages.forEach { pkg ->
                 val result = AdbService.backupApk(pkg, destDir)
                 if (result.success) successCount++ else failedCount++
@@ -226,7 +228,7 @@ class AppManagerViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    statusMessage = "Backup complete: $successCount success, $failedCount failed. Saved to $destDir"
+                    statusMessage = strings.backupComplete(successCount, failedCount, destDir)
                 )
             }
         }
@@ -234,7 +236,7 @@ class AppManagerViewModel : ViewModel() {
 
     fun exportAppList(context: Context) {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Exporting app list...") }
+            _uiState.update { it.copy(statusMessage = strings.exportingAppList) }
             try {
                 val packages = if (_uiState.value.showSystemApps) _uiState.value.systemPackages else _uiState.value.userPackages
                 val typeLabel = if (_uiState.value.showSystemApps) "system" else "user"
@@ -245,14 +247,15 @@ class AppManagerViewModel : ViewModel() {
                 }
                 val tempFile = File(context.cacheDir, "app_list_adbkit.txt")
                 tempFile.writeText(content)
-                val remotePath = "/sdcard/app_list_adbkit.txt"
+                val root = AdbService.getDeviceExternalStorageRoot()
+                val remotePath = "$root/app_list_adbkit.txt"
                 val result = AdbService.pushFile(tempFile.absolutePath, remotePath)
                 tempFile.delete()
                 _uiState.update {
-                    it.copy(statusMessage = if (result.success) "App list exported to $remotePath" else "Export failed: ${result.error}")
+                    it.copy(statusMessage = if (result.success) strings.appListExported(remotePath) else strings.exportFailed(result.error))
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(statusMessage = "Export failed: ${e.message}") }
+                _uiState.update { it.copy(statusMessage = strings.exportFailed(e.message ?: "")) }
             }
         }
     }

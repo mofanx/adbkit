@@ -1,6 +1,5 @@
 package com.adbkit.app.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
@@ -40,7 +39,7 @@ data class HomeUiState(
     val isLoadingDashboard: Boolean = false
 )
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
     private val repo = SettingsRepository(AdbKitApplication.instance)
@@ -59,7 +58,7 @@ class HomeViewModel : ViewModel() {
                     if (device == null && current.selectedDevice != null) {
                         current.copy(
                             selectedDevice = null,
-                            statusMessage = "Device disconnected",
+                            statusMessage = strings.disconnected,
                             isError = false
                         )
                     } else {
@@ -101,11 +100,11 @@ class HomeViewModel : ViewModel() {
     fun connectDevice() {
         val ip = _uiState.value.ipAddress.trim()
         if (ip.isEmpty()) {
-            _uiState.update { it.copy(statusMessage = "Please enter IP address", isError = true) }
+            _uiState.update { it.copy(statusMessage = strings.pleaseEnterIp, isError = true) }
             return
         }
         val address = if (ip.contains(":")) ip else "$ip:5555"
-        _uiState.update { it.copy(isConnecting = true, statusMessage = "Connecting...", connectionError = "") }
+        _uiState.update { it.copy(isConnecting = true, statusMessage = strings.connecting, connectionError = "") }
         viewModelScope.launch {
             val result = AdbService.connect(address)
             if (result.success && result.output.contains("connected")) {
@@ -115,7 +114,7 @@ class HomeViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
-                        statusMessage = "Connected",
+                        statusMessage = strings.connected,
                         connectionError = "",
                         isError = false,
                         selectedDevice = address
@@ -128,7 +127,7 @@ class HomeViewModel : ViewModel() {
                     it.copy(
                         isConnecting = false,
                         connectionError = errorType,
-                        statusMessage = "Connection failed",
+                        statusMessage = strings.connectionFailed,
                         isError = true
                     )
                 }
@@ -143,7 +142,7 @@ class HomeViewModel : ViewModel() {
                 AdbService.setCurrentDevice(null)
             }
             refreshDevices()
-            _uiState.update { it.copy(statusMessage = "Disconnected $device", isError = false) }
+            _uiState.update { it.copy(statusMessage = strings.disconnectedFrom(device), isError = false) }
             loadDashboard()
         }
     }
@@ -197,7 +196,7 @@ class HomeViewModel : ViewModel() {
             val localIp = getLocalIpAddress()
 
             if (localIp.isNullOrEmpty()) {
-                _uiState.update { it.copy(isScanning = false, statusMessage = "Cannot get local IP, check WiFi connection", isError = true) }
+                _uiState.update { it.copy(isScanning = false, statusMessage = strings.cannotGetLocalIp, isError = true) }
                 return@launch
             }
 
@@ -271,7 +270,7 @@ class HomeViewModel : ViewModel() {
                 it.copy(
                     isScanning = false,
                     scannedDevices = found.distinct(),
-                    statusMessage = if (found.isEmpty()) "No devices found on $subnet.0/24" else "Found ${found.size} device(s)",
+                    statusMessage = if (found.isEmpty()) strings.noDevicesFound else strings.scanResult(found.size),
                     isError = found.isEmpty()
                 )
             }
@@ -318,16 +317,16 @@ class HomeViewModel : ViewModel() {
 
     fun pairDevice(ip: String, port: String, code: String) {
         if (ip.isBlank() || port.isBlank() || code.isBlank()) {
-            _uiState.update { it.copy(statusMessage = "Please fill in all fields", isError = true) }
+            _uiState.update { it.copy(statusMessage = strings.fillAllFields, isError = true) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(showPairDialog = false, statusMessage = "Pairing...") }
+            _uiState.update { it.copy(showPairDialog = false, statusMessage = strings.pairingInProgress) }
             val result = AdbService.executeCommand("${AdbService.getAdbPath()} pair $ip:$port $code")
             if (result.success && result.output.contains("Successfully")) {
                 _uiState.update {
                     it.copy(
-                        statusMessage = "Pairing successful, connecting...",
+                        statusMessage = strings.pairingSuccess,
                         isError = false,
                         ipAddress = "$ip:$port"
                     )
@@ -337,7 +336,7 @@ class HomeViewModel : ViewModel() {
                 connectDevice()
             } else {
                 _uiState.update {
-                    it.copy(statusMessage = result.error.ifEmpty { "Pairing failed" }, isError = true)
+                    it.copy(statusMessage = result.error.ifEmpty { strings.pairingFailed }, isError = true)
                 }
             }
         }
@@ -345,14 +344,14 @@ class HomeViewModel : ViewModel() {
 
     fun restartAdbServer() {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Restarting ADB...", isError = false) }
+            _uiState.update { it.copy(statusMessage = strings.restartingAdb, isError = false) }
             val result = AdbService.restartServer()
             if (result.success) {
-                _uiState.update { it.copy(statusMessage = "ADB restarted", isError = false) }
+                _uiState.update { it.copy(statusMessage = strings.adbRestarted, isError = false) }
                 refreshDevices()
             } else {
                 _uiState.update {
-                    it.copy(statusMessage = "Restart failed: ${result.error}", isError = true)
+                    it.copy(statusMessage = strings.restartFailed(result.error), isError = true)
                 }
             }
         }
@@ -363,7 +362,7 @@ class HomeViewModel : ViewModel() {
             AdbService.disconnectAll()
             AdbService.setCurrentDevice(null)
             refreshDevices()
-            _uiState.update { it.copy(statusMessage = "All disconnected", isError = false, selectedDevice = null) }
+            _uiState.update { it.copy(statusMessage = strings.allDisconnected, isError = false, selectedDevice = null) }
         }
     }
 }

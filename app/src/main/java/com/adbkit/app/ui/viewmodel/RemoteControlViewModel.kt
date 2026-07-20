@@ -4,15 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.Surface
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
-import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.service.AdbService
 import com.adbkit.app.service.ScreenStreamService
-import com.adbkit.app.ui.strings.AppStrings
-import com.adbkit.app.ui.strings.EnStrings
-import com.adbkit.app.ui.strings.ZhStrings
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import java.util.Locale
 
 data class RemoteControlUiState(
     val maxSize: String = "720",
@@ -45,7 +39,7 @@ data class RemoteControlUiState(
     val videoHeight: Int = 0
 )
 
-class RemoteControlViewModel : ViewModel() {
+class RemoteControlViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(RemoteControlUiState())
     val uiState: StateFlow<RemoteControlUiState> = _uiState.asStateFlow()
 
@@ -53,13 +47,6 @@ class RemoteControlViewModel : ViewModel() {
 
     private var lowFpsFrames = 0
     private var wasStreaming = false
-    private var strings: AppStrings = resolveLanguage("system")
-
-    private fun resolveLanguage(language: String): AppStrings = when (language) {
-        "zh" -> ZhStrings
-        "en" -> EnStrings
-        else -> if (Locale.getDefault().language == "zh") ZhStrings else EnStrings
-    }
 
     private fun resolveStreamError(error: String): String = when {
         error.contains("REMOTE_CONTROL_SERVER_MISSING") -> strings.remoteControlServerMissing
@@ -70,11 +57,6 @@ class RemoteControlViewModel : ViewModel() {
 
     init {
         loadScreenSize()
-        viewModelScope.launch {
-            SettingsRepository(AdbKitApplication.instance).language.collect { lang ->
-                strings = resolveLanguage(lang)
-            }
-        }
         viewModelScope.launch {
             streamService.state.collect { streamState ->
                 val fps = streamState.fps

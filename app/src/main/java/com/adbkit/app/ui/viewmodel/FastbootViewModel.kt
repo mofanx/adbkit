@@ -1,6 +1,5 @@
 package com.adbkit.app.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,13 +19,13 @@ data class FastbootUiState(
     val imageMd5: String = "",
     val partitionList: List<String> = emptyList(),
     val selectedBackupPartition: String = "",
-    val backupDestination: String = "/sdcard/adbkit_partition_backup",
+    val backupDestination: String = "${AdbService.DEFAULT_REMOTE_STORAGE}/adbkit_partition_backup",
     val restoreImagePath: String = "",
     val output: String = "",
     val isExecuting: Boolean = false
 )
 
-class FastbootViewModel : ViewModel() {
+class FastbootViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(FastbootUiState())
     val uiState: StateFlow<FastbootUiState> = _uiState.asStateFlow()
 
@@ -84,12 +83,12 @@ class FastbootViewModel : ViewModel() {
             val expected = _uiState.value.expectedMd5
             val message = if (result.success) {
                 if (expected.isNotBlank() && !computed.equals(expected, ignoreCase = true)) {
-                    "MD5 mismatch! Expected $expected, got $computed"
+                    strings.md5MismatchDetail(expected, computed)
                 } else {
-                    "MD5: $computed"
+                    strings.md5Value(computed)
                 }
             } else {
-                "MD5 verification failed: ${result.error}"
+                strings.md5VerifyFailed(result.error)
             }
             appendOutput(message)
             _uiState.update { it.copy(imageMd5 = computed, isExecuting = false) }
@@ -102,7 +101,7 @@ class FastbootViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isExecuting = true) }
             val result = AdbService.saveOutputLog(log, "adbkit_fastboot_log.txt")
-            appendOutput(if (result.success) "Log saved: ${result.output}" else "Save log failed: ${result.error}")
+            appendOutput(if (result.success) strings.logSaved(result.output) else strings.saveLogFailed(result.error))
             _uiState.update { it.copy(isExecuting = false) }
         }
     }
@@ -119,7 +118,7 @@ class FastbootViewModel : ViewModel() {
                     isExecuting = false
                 )
             }
-            appendOutput(if (partitions.isNotEmpty()) "Found ${partitions.size} partitions" else "No partitions found (root may be required)")
+            appendOutput(if (partitions.isNotEmpty()) strings.partitionsFound(partitions.size) else strings.noPartitionsFound)
         }
     }
 
@@ -134,14 +133,14 @@ class FastbootViewModel : ViewModel() {
     fun backupSelectedPartition() {
         val partition = _uiState.value.selectedBackupPartition
         if (partition.isBlank()) {
-            appendOutput("Please select or enter a partition name")
+            appendOutput(strings.selectPartitionPrompt)
             return
         }
         viewModelScope.launch {
             appendOutput("$ adb shell dd if=/dev/block/bootdevice/by-name/$partition of=${_uiState.value.backupDestination}/${partition}.img")
             _uiState.update { it.copy(isExecuting = true) }
             val result = AdbService.backupPartition(partition, _uiState.value.backupDestination)
-            appendOutput(if (result.success) "Backup complete: ${result.output}" else "Backup failed: ${result.error}")
+            appendOutput(if (result.success) strings.partitionBackupComplete(result.output) else strings.partitionBackupFailed(result.error))
             _uiState.update { it.copy(isExecuting = false) }
         }
     }
@@ -154,14 +153,14 @@ class FastbootViewModel : ViewModel() {
         val partition = _uiState.value.selectedBackupPartition
         val imagePath = _uiState.value.restoreImagePath
         if (partition.isBlank() || imagePath.isBlank()) {
-            appendOutput("Please select a partition and enter the device-side image path to restore")
+            appendOutput(strings.selectPartitionAndImage)
             return
         }
         viewModelScope.launch {
             appendOutput("$ adb shell dd if=$imagePath of=/dev/block/bootdevice/by-name/$partition")
             _uiState.update { it.copy(isExecuting = true) }
             val result = AdbService.restorePartition(partition, imagePath)
-            appendOutput(if (result.success) "Restore complete: ${result.output}" else "Restore failed: ${result.error}")
+            appendOutput(if (result.success) strings.partitionRestoreComplete(result.output) else strings.partitionRestoreFailed(result.error))
             _uiState.update { it.copy(isExecuting = false) }
         }
     }
@@ -176,7 +175,7 @@ class FastbootViewModel : ViewModel() {
             _uiState.update { it.copy(isExecuting = true) }
             val result = AdbService.fastbootFlash(partition, path)
             appendOutput(result.output)
-            if (result.error.isNotEmpty()) appendOutput("Error: ${result.error}")
+            if (result.error.isNotEmpty()) appendOutput(strings.errorPrefix(result.error))
             _uiState.update { it.copy(isExecuting = false) }
         }
     }
@@ -187,7 +186,7 @@ class FastbootViewModel : ViewModel() {
             appendOutput("$ fastboot $cmd")
             val result = AdbService.fastbootCommand(cmd)
             appendOutput(result.output)
-            if (result.error.isNotEmpty()) appendOutput("Error: ${result.error}")
+            if (result.error.isNotEmpty()) appendOutput(strings.errorPrefix(result.error))
         }
     }
 
@@ -196,7 +195,7 @@ class FastbootViewModel : ViewModel() {
             appendOutput("$ fastboot flashing unlock")
             val result = AdbService.fastbootCommand("flashing", "unlock")
             appendOutput(result.output)
-            if (result.error.isNotEmpty()) appendOutput("Error: ${result.error}")
+            if (result.error.isNotEmpty()) appendOutput(strings.errorPrefix(result.error))
         }
     }
 
@@ -205,7 +204,7 @@ class FastbootViewModel : ViewModel() {
             appendOutput("$ fastboot flashing lock")
             val result = AdbService.fastbootCommand("flashing", "lock")
             appendOutput(result.output)
-            if (result.error.isNotEmpty()) appendOutput("Error: ${result.error}")
+            if (result.error.isNotEmpty()) appendOutput(strings.errorPrefix(result.error))
         }
     }
 
@@ -215,7 +214,7 @@ class FastbootViewModel : ViewModel() {
             appendOutput("$ fastboot erase $partition")
             val result = AdbService.fastbootCommand("erase", partition)
             appendOutput(result.output)
-            if (result.error.isNotEmpty()) appendOutput("Error: ${result.error}")
+            if (result.error.isNotEmpty()) appendOutput(strings.errorPrefix(result.error))
         }
     }
 

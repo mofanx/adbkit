@@ -3,7 +3,6 @@ package com.adbkit.app.ui.viewmodel
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Environment
-import androidx.lifecycle.ViewModel
 import java.io.File
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
@@ -26,7 +25,7 @@ data class FilePreview(
 )
 
 data class FileManagerUiState(
-    val currentPath: String = "/sdcard",
+    val currentPath: String = AdbService.DEFAULT_REMOTE_STORAGE,
     val files: List<Map<String, String>> = emptyList(),
     val isLoading: Boolean = false,
     val error: String = "",
@@ -42,17 +41,23 @@ data class FileManagerUiState(
     val preview: FilePreview? = null
 )
 
-class FileManagerViewModel : ViewModel() {
+class FileManagerViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(FileManagerUiState())
     val uiState: StateFlow<FileManagerUiState> = _uiState.asStateFlow()
 
     init {
-        loadFiles()
+        viewModelScope.launch {
+            val root = AdbService.getDeviceExternalStorageRoot()
+            if (_uiState.value.currentPath == AdbService.DEFAULT_REMOTE_STORAGE) {
+                _uiState.update { it.copy(currentPath = root) }
+            }
+            loadFiles()
+        }
     }
 
     private fun loadFiles() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
+            _uiState.update { it.copy(error = strings.noDeviceConnected, isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "") }
@@ -67,7 +72,7 @@ class FileManagerViewModel : ViewModel() {
                 )
                 _uiState.update { it.copy(files = sorted, isLoading = false, hasRootAccess = root, selectedFiles = emptySet(), isSelectionMode = false) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: strings.loadFailed, isLoading = false) }
             }
         }
     }
@@ -85,7 +90,10 @@ class FileManagerViewModel : ViewModel() {
     }
 
     fun navigateToHome() {
-        navigateTo("/sdcard")
+        viewModelScope.launch {
+            val root = AdbService.getDeviceExternalStorageRoot()
+            navigateTo(root)
+        }
     }
 
     fun refresh() {
@@ -98,7 +106,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "Delete failed: ${result.error}") }
+                _uiState.update { it.copy(error = strings.deleteFailed(result.error)) }
             }
         }
     }
@@ -111,7 +119,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "Rename failed: ${result.error}") }
+                _uiState.update { it.copy(error = strings.renameFailed(result.error)) }
             }
         }
     }
@@ -124,7 +132,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "Move failed: ${result.error}") }
+                _uiState.update { it.copy(error = strings.moveFailed(result.error)) }
             }
         }
     }
@@ -137,7 +145,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "Copy failed: ${result.error}") }
+                _uiState.update { it.copy(error = strings.copyFailed(result.error)) }
             }
         }
     }
@@ -174,9 +182,9 @@ class FileManagerViewModel : ViewModel() {
             val failed = results.filterNot { it.success }
             _uiState.update { it.copy(isLoading = false) }
             if (failed.isEmpty()) {
-                _uiState.update { it.copy(statusMessage = "Deleted ${paths.size} item(s)") }
+                _uiState.update { it.copy(statusMessage = strings.deletedItems(paths.size)) }
             } else {
-                _uiState.update { it.copy(error = "Batch delete failed for ${failed.size} item(s): ${failed.first().error}") }
+                _uiState.update { it.copy(error = strings.batchDeleteFailed(failed.size, failed.first().error)) }
             }
             loadFiles()
         }
@@ -184,7 +192,7 @@ class FileManagerViewModel : ViewModel() {
 
     fun pullFile(remotePath: String, fileName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isTransferring = true, statusMessage = "Downloading $fileName...", transferBytes = 0L, transferTotal = 0L) }
+            _uiState.update { it.copy(isTransferring = true, statusMessage = strings.downloadingFile(fileName), transferBytes = 0L, transferTotal = 0L) }
             val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
             downloadDir.mkdirs()
             val localPath = "${downloadDir.absolutePath}/$fileName"
@@ -197,7 +205,7 @@ class FileManagerViewModel : ViewModel() {
                     isTransferring = false,
                     transferBytes = 0L,
                     transferTotal = 0L,
-                    statusMessage = if (result.success) "Downloaded $fileName ($size) to $localPath" else "Download failed: ${result.error}"
+                    statusMessage = if (result.success) strings.downloadedFile(fileName, size, localPath) else strings.downloadFailedFmt(result.error)
                 )
             }
         }
@@ -206,7 +214,7 @@ class FileManagerViewModel : ViewModel() {
     fun pushFile(localPath: String, fileName: String) {
         viewModelScope.launch {
             val size = formatFileSize(java.io.File(localPath).length())
-            _uiState.update { it.copy(isTransferring = true, statusMessage = "Uploading $fileName ($size)...", transferBytes = 0L, transferTotal = 0L) }
+            _uiState.update { it.copy(isTransferring = true, statusMessage = strings.uploadingFile(fileName, size), transferBytes = 0L, transferTotal = 0L) }
             val remotePath = "${_uiState.value.currentPath}/$fileName"
             val result = AdbService.pushFileWithProgress(localPath, remotePath) { copied, total ->
                 _uiState.update { it.copy(transferBytes = copied, transferTotal = total) }
@@ -216,13 +224,13 @@ class FileManagerViewModel : ViewModel() {
                     isTransferring = false,
                     transferBytes = 0L,
                     transferTotal = 0L,
-                    statusMessage = if (result.success) "Uploaded $fileName ($size)" else "Upload failed: ${result.error}"
+                    statusMessage = if (result.success) strings.uploadedFile(fileName, size) else strings.uploadFailedFmt(result.error)
                 )
             }
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "Upload failed: ${result.error}") }
+                _uiState.update { it.copy(error = strings.uploadFailedFmt(result.error)) }
             }
         }
     }
@@ -283,14 +291,14 @@ class FileManagerViewModel : ViewModel() {
                             isLoading = false,
                             preview = FilePreview(
                                 path, name, FilePreviewType.TEXT,
-                                text = if (result.success) result.output else "Preview failed: ${result.error}"
+                                text = if (result.success) result.output else strings.previewFailed(result.error)
                             )
                         )
                     }
                 }
                 else -> {
                     _uiState.update {
-                        it.copy(preview = FilePreview(path, name, FilePreviewType.UNSUPPORTED, error = "Unsupported file type"))
+                        it.copy(preview = FilePreview(path, name, FilePreviewType.UNSUPPORTED, error = strings.unsupportedFileType))
                     }
                 }
             }
@@ -303,12 +311,12 @@ class FileManagerViewModel : ViewModel() {
 
     fun installApk(path: String, fileName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, statusMessage = "Installing $fileName...") }
+            _uiState.update { it.copy(isLoading = true, statusMessage = strings.installingFile(fileName)) }
             val result = AdbService.installApp(path)
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    statusMessage = if (result.success) "Installed $fileName" else "Install failed: ${result.error}"
+                    statusMessage = if (result.success) strings.installedFile(fileName) else strings.installFailedFmt(result.error)
                 )
             }
         }
@@ -323,7 +331,7 @@ class FileManagerViewModel : ViewModel() {
             if (result.success) {
                 loadFiles()
             } else {
-                _uiState.update { it.copy(error = "Create failed: ${result.error}") }
+                _uiState.update { it.copy(error = strings.createFailed(result.error)) }
             }
         }
     }

@@ -1,7 +1,6 @@
 package com.adbkit.app.ui.viewmodel
 
 import android.net.Uri
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.SettingsRepository
@@ -29,7 +28,7 @@ data class SettingsUiState(
     val onboardingShown: Boolean = true
 )
 
-class SettingsViewModel : ViewModel() {
+class SettingsViewModel : LocalizedViewModel() {
     private val repo = SettingsRepository(AdbKitApplication.instance)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -115,9 +114,9 @@ class SettingsViewModel : ViewModel() {
             val actualPath = AdbService.getAdbPath()
             val result = AdbService.executeCommand("$actualPath version")
             val status = if (result.success) {
-                "✓ ADB OK: ${result.output.lines().firstOrNull() ?: ""}"
+                strings.adbAvailable(result.output.lines().firstOrNull() ?: "")
             } else {
-                "✗ ADB Error: ${result.error.lines().firstOrNull()?.take(100) ?: "not found"}"
+                strings.adbUnavailable(result.error.lines().firstOrNull()?.take(100) ?: strings.adbNotFound)
             }
             _uiState.update {
                 it.copy(isCheckingAdb = false, adbStatus = status, adbReady = result.success)
@@ -133,14 +132,14 @@ class SettingsViewModel : ViewModel() {
     fun exportSettings(uri: Uri) {
         viewModelScope.launch {
             val success = repo.exportSettings(uri)
-            _uiState.update { it.copy(dataStatus = if (success) "Settings exported" else "Export failed") }
+            _uiState.update { it.copy(dataStatus = if (success) strings.settingsExported else strings.settingsExportFailed) }
         }
     }
 
     fun importSettings(uri: Uri) {
         viewModelScope.launch {
             val success = repo.importSettings(uri)
-            _uiState.update { it.copy(dataStatus = if (success) "Settings imported" else "Import failed") }
+            _uiState.update { it.copy(dataStatus = if (success) strings.settingsImported else strings.settingsImportFailed) }
         }
     }
 

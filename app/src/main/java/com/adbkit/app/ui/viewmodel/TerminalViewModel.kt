@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.AdbKitApplication
 import com.adbkit.app.data.MacroRepository
@@ -39,7 +38,7 @@ data class TerminalUiState(
         else outputLines.filter { it.contains(searchQuery, ignoreCase = true) }
 }
 
-class TerminalViewModel : ViewModel() {
+class TerminalViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(TerminalUiState(currentDevice = AdbService.getCurrentDevice()))
     val uiState: StateFlow<TerminalUiState> = _uiState.asStateFlow()
     private val repo = SettingsRepository(AdbKitApplication.instance)
@@ -130,26 +129,26 @@ class TerminalViewModel : ViewModel() {
     fun runMacro(macro: ScriptMacro) {
         val commands = macro.commands
         if (commands.isEmpty()) {
-            _uiState.update { it.copy(outputLines = it.outputLines + "Macro '${macro.name}' has no commands") }
+            _uiState.update { it.copy(outputLines = it.outputLines + strings.macroEmpty(macro.name)) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isExecuting = true, outputLines = it.outputLines + "--- Running macro '${macro.name}' (${commands.size} commands) ---") }
+            _uiState.update { it.copy(isExecuting = true, outputLines = it.outputLines + strings.runningMacro(macro.name, commands.size)) }
             commands.forEach { cmd ->
                 val prefix = if (_uiState.value.isShellMode) "$ " else ">>> adb "
                 _uiState.update { it.copy(outputLines = it.outputLines + "$prefix$cmd") }
                 val result = try {
                     if (_uiState.value.isShellMode) AdbService.shell(cmd) else AdbService.adb(cmd)
                 } catch (e: Exception) {
-                    CommandResult(false, "", e.message ?: "Error", -1)
+                    CommandResult(false, "", e.message ?: strings.commandFailed, -1)
                 }
                 val outLines = mutableListOf<String>()
                 if (result.output.isNotEmpty()) outLines.addAll(result.output.lines())
-                if (result.error.isNotEmpty()) outLines.addAll(result.error.lines().map { "ERR: $it" })
-                if (outLines.isEmpty()) outLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
+                if (result.error.isNotEmpty()) outLines.addAll(result.error.lines().map { strings.errorPrefix(it) })
+                if (outLines.isEmpty()) outLines.add(if (result.success) strings.okNoOutput else strings.failed)
                 _uiState.update { it.copy(outputLines = it.outputLines + outLines) }
             }
-            _uiState.update { it.copy(isExecuting = false, outputLines = it.outputLines + "--- Macro finished ---") }
+            _uiState.update { it.copy(isExecuting = false, outputLines = it.outputLines + strings.macroFinished) }
         }
     }
 
@@ -166,7 +165,7 @@ class TerminalViewModel : ViewModel() {
     }
 
     fun clearOutput() {
-        _uiState.update { it.copy(outputLines = listOf("--- Cleared ---")) }
+        _uiState.update { it.copy(outputLines = listOf(strings.outputCleared)) }
     }
 
     fun executeCommand() {
@@ -195,7 +194,7 @@ class TerminalViewModel : ViewModel() {
                     AdbService.adb(cmd)
                 }
             } catch (e: Exception) {
-                CommandResult(false, "", e.message ?: "Cancelled", -1)
+                CommandResult(false, "", e.message ?: strings.cancelled, -1)
             }
 
             val outputLines = mutableListOf<String>()
@@ -203,13 +202,13 @@ class TerminalViewModel : ViewModel() {
                 outputLines.addAll(result.output.lines())
             }
             if (result.error.isNotEmpty()) {
-                outputLines.addAll(result.error.lines().map { "ERR: $it" })
+                outputLines.addAll(result.error.lines().map { strings.errorPrefix(it) })
             }
             if (outputLines.isEmpty()) {
-                outputLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
+                outputLines.add(if (result.success) strings.okNoOutput else strings.failed)
             }
-            if (!result.success && result.exitCode == -1 && result.error.contains("Cancelled")) {
-                outputLines.add("(CANCELLED)")
+            if (!result.success && result.exitCode == -1 && (result.error.contains(strings.cancelled) || result.error.contains("cancel", ignoreCase = true))) {
+                outputLines.add(strings.cancelled)
             }
 
             _uiState.update {
@@ -237,7 +236,7 @@ class TerminalViewModel : ViewModel() {
             val result = AdbService.saveOutputLog(text, "adbkit_terminal_log.txt")
             _uiState.update {
                 it.copy(
-                    outputLines = it.outputLines + if (result.success) "Output saved: ${result.output}" else "Save failed: ${result.error}"
+                    outputLines = it.outputLines + if (result.success) strings.outputSaved(result.output) else strings.saveFailed(result.error)
                 )
             }
         }
@@ -246,26 +245,26 @@ class TerminalViewModel : ViewModel() {
     fun runFavoritesScript() {
         val favorites = _uiState.value.commandFavorites
         if (favorites.isEmpty()) {
-            _uiState.update { it.copy(outputLines = it.outputLines + "No favorite commands to run") }
+            _uiState.update { it.copy(outputLines = it.outputLines + strings.noFavoriteCommands) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isExecuting = true, outputLines = it.outputLines + "--- Running favorite script (${favorites.size} commands) ---") }
+            _uiState.update { it.copy(isExecuting = true, outputLines = it.outputLines + strings.runningFavorites(favorites.size)) }
             favorites.forEach { cmd ->
                 val prefix = if (_uiState.value.isShellMode) "$ " else ">>> adb "
                 _uiState.update { it.copy(outputLines = it.outputLines + "$prefix$cmd") }
                 val result = try {
                     if (_uiState.value.isShellMode) AdbService.shell(cmd) else AdbService.adb(cmd)
                 } catch (e: Exception) {
-                    CommandResult(false, "", e.message ?: "Error", -1)
+                    CommandResult(false, "", e.message ?: strings.commandFailed, -1)
                 }
                 val outLines = mutableListOf<String>()
                 if (result.output.isNotEmpty()) outLines.addAll(result.output.lines())
-                if (result.error.isNotEmpty()) outLines.addAll(result.error.lines().map { "ERR: $it" })
-                if (outLines.isEmpty()) outLines.add(if (result.success) "(OK, no output)" else "(FAILED)")
+                if (result.error.isNotEmpty()) outLines.addAll(result.error.lines().map { strings.errorPrefix(it) })
+                if (outLines.isEmpty()) outLines.add(if (result.success) strings.okNoOutput else strings.failed)
                 _uiState.update { it.copy(outputLines = it.outputLines + outLines) }
             }
-            _uiState.update { it.copy(isExecuting = false, outputLines = it.outputLines + "--- Script finished ---") }
+            _uiState.update { it.copy(isExecuting = false, outputLines = it.outputLines + strings.scriptFinished) }
         }
     }
 

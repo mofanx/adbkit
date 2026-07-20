@@ -1,6 +1,5 @@
 package com.adbkit.app.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,7 +72,7 @@ data class ProcessManagerUiState(
     }
 }
 
-class ProcessManagerViewModel : ViewModel() {
+class ProcessManagerViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(ProcessManagerUiState())
     val uiState: StateFlow<ProcessManagerUiState> = _uiState.asStateFlow()
 
@@ -83,7 +82,7 @@ class ProcessManagerViewModel : ViewModel() {
 
     fun refresh() {
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(error = "No device connected", isLoading = false) }
+            _uiState.update { it.copy(error = strings.noDeviceConnected, isLoading = false) }
             return
         }
         _uiState.update { it.copy(isLoading = true, error = "", statusMessage = "") }
@@ -98,7 +97,7 @@ class ProcessManagerViewModel : ViewModel() {
                     _uiState.update { it.copy(processes = processes, isLoading = false, memoryInfo = memInfo) }
                 }
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Load failed", isLoading = false) }
+                _uiState.update { it.copy(error = e.message ?: strings.loadFailed, isLoading = false) }
             }
         }
     }
@@ -160,7 +159,7 @@ class ProcessManagerViewModel : ViewModel() {
                         ppid = result["ppid"] ?: "",
                         cpuTime = result["cpuTime"] ?: "",
                         residentPages = result["residentPages"] ?: "",
-                        error = result["commandLine"].isNullOrEmpty().let { if (it) "Unable to read process details" else "" }
+                        error = result["commandLine"].isNullOrEmpty().let { if (it) strings.unableToReadProcessDetails else "" }
                     )
                 )
             }
@@ -175,23 +174,23 @@ class ProcessManagerViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.killProcess(pid)
             if (result.success) {
-                _uiState.update { it.copy(statusMessage = "Process killed") }
+                _uiState.update { it.copy(statusMessage = strings.processKilled) }
                 refresh()
             } else {
-                _uiState.update { it.copy(statusMessage = "Kill failed: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = strings.killFailed(result.error)) }
             }
         }
     }
 
     fun forceStopApp(packageName: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Stopping $packageName...") }
+            _uiState.update { it.copy(statusMessage = strings.stoppingApp(packageName)) }
             val result = AdbService.forceStopApp(packageName)
             if (result.success) {
-                _uiState.update { it.copy(statusMessage = "$packageName stopped") }
+                _uiState.update { it.copy(statusMessage = strings.appStopped(packageName)) }
                 refresh()
             } else {
-                _uiState.update { it.copy(statusMessage = "Stop failed: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = strings.stopFailed(result.error)) }
             }
         }
     }

@@ -21,6 +21,9 @@ import java.io.InputStreamReader
 
 object AdbService {
 
+    @Suppress("SdCardPath")
+    const val DEFAULT_REMOTE_STORAGE = "/sdcard"
+
     private val _currentDevice = MutableStateFlow<String?>(null)
     val currentDevice: StateFlow<String?> = _currentDevice.asStateFlow()
 
@@ -42,8 +45,11 @@ object AdbService {
 
     fun getFastbootPath(): String = fastbootPath
 
+    private var deviceExternalStorageRoot: String? = null
+
     fun setCurrentDevice(address: String?) {
         _currentDevice.value = address
+        deviceExternalStorageRoot = null
         heartbeatJob?.cancel()
         heartbeatJob = null
         if (address != null) {
@@ -65,6 +71,25 @@ object AdbService {
     suspend fun hasRootAccess(): Boolean {
         val result = shell("su -c 'id -u' 2>/dev/null")
         return result.success && result.output.trim() == "0"
+    }
+
+    /**
+     * Get the target device's external storage root path dynamically.
+     * Falls back to /sdcard for broad compatibility, but reduces lint warnings
+     * and works on devices where /sdcard is not the primary external storage.
+     */
+    @Suppress("SdCardPath")
+    suspend fun getDeviceExternalStorageRoot(): String {
+        deviceExternalStorageRoot?.let { return it }
+        if (getCurrentDevice() == null) return DEFAULT_REMOTE_STORAGE
+        val result = shell("echo \$EXTERNAL_STORAGE")
+        val root = if (result.success && result.output.isNotBlank()) {
+            result.output.trim().removeSuffix("/")
+        } else {
+            DEFAULT_REMOTE_STORAGE
+        }
+        deviceExternalStorageRoot = root
+        return root
     }
 
     /**
@@ -483,6 +508,8 @@ object AdbService {
         val info = mutableMapOf<String, String>()
         val dump = shell("dumpsys package ${shellQuote(packageName)}")
         if (dump.success) {
+            var inSignatures = false
+            val signatures = mutableListOf<String>()
             dump.output.lines().forEach { line ->
                 val trimmed = line.trim()
                 when {
@@ -494,14 +521,20 @@ object AdbService {
                     trimmed.startsWith("dataDir=") -> info["data_dir"] = trimmed.substringAfter("=")
                     trimmed.startsWith("targetSdk=") -> info["target_sdk"] = trimmed.substringAfter("=")
                     trimmed.startsWith("minSdk=") -> info["min_sdk"] = trimmed.substringAfter("=")
-                    trimmed.startsWith("installerPackageName=") -> info["installer"] = trimmed.substringAfter("=")
+                    trimmed.startsWith("installerPackageName=") -> info["installer"] = trimmed.substringAfter("=").ifBlank { "unknown" }
                     trimmed.startsWith("signatures:") || trimmed.startsWith("SigningInfo:") || trimmed.startsWith("signature") -> {
-                        if (info["signatures"].isNullOrBlank()) {
-                            info["signatures"] = "present"
-                        }
+                        inSignatures = true
+                    }
+                    inSignatures && (trimmed.isEmpty() || trimmed.endsWith(":") || trimmed.startsWith("Package [")) -> {
+                        inSignatures = false
+                    }
+                    inSignatures && (trimmed.contains("fingerprint", ignoreCase = true) || trimmed.startsWith("sha256", ignoreCase = true)) -> {
+                        val fp = trimmed.substringAfterLast(" ").removeSuffix(",").removePrefix("sha256=")
+                        if (fp.isNotBlank() && fp !in signatures) signatures.add(fp)
                     }
                 }
             }
+            info["signatures"] = if (signatures.isNotEmpty()) signatures.first() else if (inSignatures) "present" else ""
         }
         return info
     }
@@ -514,16 +547,21 @@ object AdbService {
             .map { it.removePrefix("package:").trim() }
     }
 
-    suspend fun backupApk(packageName: String, destDir: String = "/sdcard/app_backup_adbkit", fileName: String = "${packageName}.apk"): CommandResult {
+    suspend fun backupApk(
+        packageName: String,
+        destDir: String? = null,
+        fileName: String = "${packageName}.apk"
+    ): CommandResult {
         val paths = getApkPaths(packageName)
         if (paths.isEmpty()) return CommandResult(success = false, output = "", error = "No APK path found for $packageName", exitCode = 1)
-        val mkdirResult = shell("mkdir -p ${shellQuote(destDir)}")
+        val targetDir = destDir ?: "${getDeviceExternalStorageRoot()}/app_backup_adbkit"
+        val mkdirResult = shell("mkdir -p ${shellQuote(targetDir)}")
         if (!mkdirResult.success) return mkdirResult
         paths.forEachIndexed { index, path ->
-            val outFile = if (paths.size > 1) "$destDir/${packageName}_${index}.apk" else "$destDir/$fileName"
+            val outFile = if (paths.size > 1) "$targetDir/${packageName}_${index}.apk" else "$targetDir/$fileName"
             shell("cp -f ${shellQuote(path)} ${shellQuote(outFile)}")
         }
-        return CommandResult(success = true, output = "Backed up to $destDir", error = "", exitCode = 0)
+        return CommandResult(success = true, output = "Backed up to $targetDir", error = "", exitCode = 0)
     }
 
     suspend fun listPartitions(): List<String> {
@@ -538,12 +576,13 @@ object AdbService {
         return result.output.lines().filter { it.isNotBlank() && !it.startsWith("/") }
     }
 
-    suspend fun backupPartition(partition: String, destDir: String = "/sdcard/adbkit_partition_backup"): CommandResult {
+    suspend fun backupPartition(partition: String, destDir: String? = null): CommandResult {
         if (partition.isBlank()) return CommandResult(false, "", "Partition name is empty", 1)
         val root = hasRootAccess()
         val src = "/dev/block/bootdevice/by-name/${partition}"
-        val out = "$destDir/${partition}.img"
-        val mkdir = shell("mkdir -p ${shellQuote(destDir)}")
+        val targetDir = destDir ?: "${getDeviceExternalStorageRoot()}/adbkit_partition_backup"
+        val out = "$targetDir/${partition}.img"
+        val mkdir = shell("mkdir -p ${shellQuote(targetDir)}")
         if (!mkdir.success) return mkdir
         val cmd = if (root) {
             "su -c 'dd if=${shellQuote(src)} of=${shellQuote(out)} bs=4M status=none'"
@@ -712,7 +751,8 @@ object AdbService {
     }
 
     suspend fun takeScreenshot(savePath: String): CommandResult {
-        val remotePath = "/sdcard/screenshot_temp.png"
+        val root = getDeviceExternalStorageRoot()
+        val remotePath = "$root/screenshot_temp.png"
         val cap = shell("screencap -p ${shellQuote(remotePath)}")
         if (!cap.success) return cap
         val pull = adb("pull", shellQuote(remotePath), shellQuote(savePath))
@@ -721,7 +761,8 @@ object AdbService {
     }
 
     suspend fun startScreenRecord(savePath: String, timeLimit: Int = 180): CommandResult {
-        val remotePath = "/sdcard/screenrecord_temp.mp4"
+        val root = getDeviceExternalStorageRoot()
+        val remotePath = "$root/screenrecord_temp.mp4"
         return shell("screenrecord --time-limit ${shellQuote(timeLimit.toString())} ${shellQuote(remotePath)}")
     }
 

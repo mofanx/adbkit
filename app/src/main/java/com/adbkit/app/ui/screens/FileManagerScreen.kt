@@ -175,10 +175,11 @@ fun FileManagerScreen(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                val externalRoot = com.adbkit.app.service.AdbService.DEFAULT_REMOTE_STORAGE
                 listOf(
-                    "/sdcard" to strings.sdCard,
-                    "/sdcard/Download" to strings.download,
-                    "/sdcard/DCIM" to strings.album,
+                    externalRoot to strings.sdCard,
+                    "$externalRoot/Download" to strings.download,
+                    "$externalRoot/DCIM" to strings.album,
                     "/data" to strings.data,
                     "/" to strings.rootDir
                 ).forEach { (path, label) ->

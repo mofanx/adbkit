@@ -1,6 +1,5 @@
 package com.adbkit.app.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adbkit.app.service.AdbService
 import kotlinx.coroutines.CancellationException
@@ -21,7 +20,7 @@ data class ToolsUiState(
     val currentBrightness: String = ""
 )
 
-class ToolsViewModel : ViewModel() {
+class ToolsViewModel : LocalizedViewModel() {
     private val _uiState = MutableStateFlow(ToolsUiState())
     val uiState: StateFlow<ToolsUiState> = _uiState.asStateFlow()
     private var screenRecordJob: Job? = null
@@ -30,7 +29,7 @@ class ToolsViewModel : ViewModel() {
         when (action) {
             "screenshot" -> takeScreenshot()
             "screenrecord" -> startScreenRecord()
-            "install" -> _uiState.update { it.copy(statusMessage = "Please select APK via file manager") }
+            "install" -> _uiState.update { it.copy(statusMessage = strings.pleaseSelectApk) }
             "reboot" -> _uiState.update { it.copy(activeDialog = "reboot") }
             "input_text" -> _uiState.update { it.copy(activeDialog = "input_text") }
             "key_event" -> _uiState.update { it.copy(activeDialog = "key_event") }
@@ -69,12 +68,13 @@ class ToolsViewModel : ViewModel() {
 
     private fun takeScreenshot() {
         viewModelScope.launch {
-            val path = "/sdcard/screenshot_adbkit.png"
-            _uiState.update { it.copy(statusMessage = "Taking screenshot...") }
-            val result = AdbService.shell("screencap -p $path")
+            val root = AdbService.getDeviceExternalStorageRoot()
+            val path = "$root/screenshot_adbkit.png"
+            _uiState.update { it.copy(statusMessage = strings.takingScreenshot) }
+            val result = AdbService.shell("screencap -p ${AdbService.shellQuote(path)}")
             _uiState.update {
                 it.copy(
-                    statusMessage = if (result.success) "Screenshot saved to $path" else "Screenshot failed: ${result.error}",
+                    statusMessage = if (result.success) strings.screenshotSaved(path) else strings.screenshotFailed(result.error),
                     lastScreenshotPath = if (result.success) path else ""
                 )
             }
@@ -83,34 +83,34 @@ class ToolsViewModel : ViewModel() {
 
     private fun startScreenRecord() {
         if (screenRecordJob?.isActive == true) return
-        val path = "/sdcard/screenrecord_adbkit.mp4"
         screenRecordJob?.cancel()
         screenRecordJob = viewModelScope.launch {
+            val root = AdbService.getDeviceExternalStorageRoot()
+            val path = "$root/screenrecord_adbkit.mp4"
             try {
-                _uiState.update { it.copy(isRecording = true, statusMessage = "Recording... File: $path") }
-                val result = AdbService.shell("screenrecord --time-limit 180 $path")
+                _uiState.update { it.copy(isRecording = true, statusMessage = strings.recordingFile(path)) }
+                val result = AdbService.shell("screenrecord --time-limit 180 ${AdbService.shellQuote(path)}")
                 if (result.success || result.error.contains("killed", ignoreCase = true)) {
-                    _uiState.update { it.copy(isRecording = false, statusMessage = "Recording saved to $path") }
+                    _uiState.update { it.copy(isRecording = false, statusMessage = strings.recordingSaved(path)) }
                 } else {
-                    _uiState.update { it.copy(isRecording = false, statusMessage = "Record failed: ${result.error}") }
+                    _uiState.update { it.copy(isRecording = false, statusMessage = strings.recordFailed(result.error)) }
                 }
             } catch (e: CancellationException) {
-                stopScreenRecordProcess(path)
+                stopScreenRecordProcess()
             }
         }
     }
 
     fun stopScreenRecord() {
-        val path = "/sdcard/screenrecord_adbkit.mp4"
         screenRecordJob?.cancel()
         screenRecordJob = null
         viewModelScope.launch {
-            stopScreenRecordProcess(path)
-            _uiState.update { it.copy(isRecording = false, statusMessage = "Recording stopped. File: $path") }
+            stopScreenRecordProcess()
+            _uiState.update { it.copy(isRecording = false, statusMessage = strings.recordingStopped) }
         }
     }
 
-    private suspend fun stopScreenRecordProcess(path: String) {
+    private suspend fun stopScreenRecordProcess() {
         // Send SIGINT to any screenrecord process on the device
         AdbService.shell("pkill -2 screenrecord 2>/dev/null || kill -2 \$(pidof screenrecord) 2>/dev/null || true")
         // Give the process a moment to flush and stop
@@ -119,10 +119,10 @@ class ToolsViewModel : ViewModel() {
 
     fun reboot(mode: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(activeDialog = "", statusMessage = "Rebooting...") }
+            _uiState.update { it.copy(activeDialog = "", statusMessage = strings.rebooting) }
             val result = AdbService.reboot(mode)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Reboot command sent" else "Reboot failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.rebootCommandSent else strings.rebootFailed(result.error))
             }
         }
     }
@@ -132,7 +132,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.inputText(text)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Text sent" else "Input failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.textSent else strings.inputFailed(result.error))
             }
         }
     }
@@ -141,7 +141,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.inputKeyEvent(code)
             if (!result.success) {
-                _uiState.update { it.copy(statusMessage = "Key event failed: ${result.error}") }
+                _uiState.update { it.copy(statusMessage = strings.keyEventFailed(result.error)) }
             }
         }
     }
@@ -151,7 +151,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.setScreenBrightness(value)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Brightness set to $value" else "Set failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.brightnessSet(value) else strings.setFailed(result.error))
             }
         }
     }
@@ -160,7 +160,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.setScreenTimeout(300000) // 5 minutes
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Screen timeout set to 5min" else "Set failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.screenTimeoutSet else strings.setFailed(result.error))
             }
         }
     }
@@ -171,7 +171,7 @@ class ToolsViewModel : ViewModel() {
             val enable = status.output.contains("disabled", ignoreCase = true)
             val result = AdbService.toggleWifi(enable)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "WiFi ${if (enable) "ON" else "OFF"}" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.toggleState(strings.toolWifiToggle, if (enable) strings.on else strings.off) else strings.operationFailed(result.error))
             }
         }
     }
@@ -182,7 +182,7 @@ class ToolsViewModel : ViewModel() {
             val currentlyOn = !status.output.contains("OFF", ignoreCase = true) && status.output.contains("ON", ignoreCase = true)
             val result = AdbService.toggleBluetooth(!currentlyOn)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Bluetooth ${if (!currentlyOn) "ON" else "OFF"}" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.toggleState(strings.toolBluetoothToggle, if (!currentlyOn) strings.on else strings.off) else strings.operationFailed(result.error))
             }
         }
     }
@@ -193,7 +193,7 @@ class ToolsViewModel : ViewModel() {
             val currentlyOn = status.output.trim() == "1"
             val result = AdbService.toggleAirplaneMode(!currentlyOn)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Airplane mode ${if (!currentlyOn) "ON" else "OFF"}" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.toggleState(strings.toolAirplaneMode, if (!currentlyOn) strings.on else strings.off) else strings.operationFailed(result.error))
             }
         }
     }
@@ -203,7 +203,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.openUrl(url)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "URL opened" else "Open failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.urlOpened else strings.openUrlFailed(result.error))
             }
         }
     }
@@ -213,7 +213,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update { it.copy(activeDialog = "") }
             val result = AdbService.launchApp(pkg)
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "App launched" else "Launch failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.appLaunched(pkg) else strings.launchFailed(result.error))
             }
         }
     }
@@ -222,7 +222,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.dumpActivity()
             _uiState.update {
-                it.copy(statusMessage = if (result.success) result.output else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) result.output else strings.currentActivityFailed(result.error))
             }
         }
     }
@@ -233,7 +233,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     activeDialog = "logcat_view",
-                    commandOutput = if (result.success) result.output else "Failed: ${result.error}"
+                    commandOutput = if (result.success) result.output else strings.operationFailed(result.error)
                 )
             }
         }
@@ -242,7 +242,7 @@ class ToolsViewModel : ViewModel() {
     fun clearLogcat() {
         viewModelScope.launch {
             AdbService.clearLogcat()
-            _uiState.update { it.copy(commandOutput = "Log cleared") }
+            _uiState.update { it.copy(commandOutput = strings.logCleared) }
         }
     }
 
@@ -252,7 +252,7 @@ class ToolsViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     activeDialog = "sysprop_view",
-                    commandOutput = if (result.success) result.output else "Failed: ${result.error}"
+                    commandOutput = if (result.success) result.output else strings.operationFailed(result.error)
                 )
             }
         }
@@ -260,11 +260,11 @@ class ToolsViewModel : ViewModel() {
 
     fun setSystemProp(name: String, value: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(statusMessage = "Setting $name...") }
+            _uiState.update { it.copy(statusMessage = strings.settingProperty(name)) }
             val result = AdbService.setSystemProp(name, value)
             _uiState.update {
                 it.copy(
-                    statusMessage = if (result.success) "Property $name set" else "Set failed: ${result.error}"
+                    statusMessage = if (result.success) strings.propertySet(name) else strings.setFailed(result.error)
                 )
             }
             if (result.success) showSystemProps()
@@ -280,7 +280,7 @@ class ToolsViewModel : ViewModel() {
                 AdbService.shell("wm density $dpi")
             }
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Density changed" else "Change failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.densityChanged else strings.changeFailed(result.error))
             }
         }
     }
@@ -294,7 +294,7 @@ class ToolsViewModel : ViewModel() {
                 AdbService.shell("wm size $res")
             }
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Resolution changed" else "Change failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.resolutionChanged else strings.changeFailed(result.error))
             }
         }
     }
@@ -303,7 +303,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.shell("settings put global policy_control immersive.navigation=*")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Navigation bar hidden" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.toggleState(strings.toolNavBar, strings.hidden) else strings.operationFailed(result.error))
             }
         }
     }
@@ -312,7 +312,7 @@ class ToolsViewModel : ViewModel() {
         viewModelScope.launch {
             val result = AdbService.shell("settings put global policy_control immersive.status=*")
             _uiState.update {
-                it.copy(statusMessage = if (result.success) "Status bar hidden" else "Failed: ${result.error}")
+                it.copy(statusMessage = if (result.success) strings.toggleState(strings.toolStatusBar, strings.hidden) else strings.operationFailed(result.error))
             }
         }
     }
