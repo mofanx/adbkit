@@ -70,6 +70,7 @@ class ScreenStreamService {
     private var frameCount = 0
     private var lastFpsTime = 0L
     private var serverPushed = false
+    private var lastPushedDevice: String? = null
 
     fun startStream(surface: Surface, config: StreamConfig, scope: CoroutineScope) {
         stopStream()
@@ -95,26 +96,24 @@ class ScreenStreamService {
     }
 
     private suspend fun ensureServerPushed() {
-        if (serverPushed) return
-        val context = AdbKitApplication.instance
         val device = AdbService.getCurrentDevice()
-        val adbPath = AdbService.getAdbPath()
+        if (serverPushed && lastPushedDevice == device) return
+
+        val context = AdbKitApplication.instance
+        if (context.assets.list("")?.contains(SERVER_DEX) != true) {
+            throw RuntimeException("REMOTE_CONTROL_SERVER_MISSING")
+        }
 
         val tempFile = java.io.File(context.cacheDir, SERVER_DEX)
         context.assets.open(SERVER_DEX).use { input ->
             tempFile.outputStream().use { output -> input.copyTo(output) }
         }
 
-        val cmd = buildString {
-            append(adbPath)
-            if (device != null) append(" -s $device")
-            append(" push '${tempFile.absolutePath}' '$DEVICE_SERVER_PATH'")
-        }
-        Log.d(TAG, "Push DEX: $cmd")
-        val result = AdbService.executeCommand(cmd)
-        if (!result.success) throw RuntimeException("Push failed: ${result.error}")
+        val result = AdbService.pushFile(tempFile.absolutePath, DEVICE_SERVER_PATH)
+        if (!result.success) throw RuntimeException("REMOTE_CONTROL_PUSH_FAILED|${result.error}")
         Log.d(TAG, "DEX pushed")
         serverPushed = true
+        lastPushedDevice = device
     }
 
     private suspend fun startServerStream(surface: Surface, config: StreamConfig, scope: CoroutineScope) {

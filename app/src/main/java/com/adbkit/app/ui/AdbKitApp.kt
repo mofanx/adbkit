@@ -118,7 +118,7 @@ private fun AdbKitContent(
     }
 
     // Double-press back to disconnect (with toast on first press)
-    var lastBackPressTime by remember { mutableStateOf(0L) }
+    var lastBackPressTime by remember { mutableLongStateOf(0L) }
     // Track fullscreen state for remote control page
     var isRemoteFullscreen by remember { mutableStateOf(false) }
 

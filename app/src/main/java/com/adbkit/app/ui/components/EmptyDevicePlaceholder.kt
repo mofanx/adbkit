@@ -21,8 +21,8 @@ import com.adbkit.app.ui.strings.LocalStrings
 @Composable
 fun EmptyDevicePlaceholder(
     onRetry: () -> Unit,
-    message: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    message: String? = null
 ) {
     val strings = LocalStrings.current
     Column(

@@ -357,6 +357,27 @@ interface AppStrings {
     val btnHome: String
     val btnRecent: String
     val btnMore: String
+    val btnVolumeUp: String
+    val btnVolumeDown: String
+    val btnPower: String
+    val btnExit: String
+    val btnPaste: String
+
+    val remoteControlNoDevice: String
+    val remoteControlConnecting: String
+    val remoteControlConnected: String
+    val remoteControlConnectionFailed: String
+    val remoteControlStreamError: String
+    val remoteControlTextSent: String
+    val remoteControlTextSendFailed: String
+    val remoteControlClipboardEmpty: String
+    val remoteControlServerMissing: String
+    val remoteControlPushFailed: String
+    val screenOffCommandSent: String
+    val screenOnCommandSent: String
+    val screenOffFailed: String
+    val screenOnFailed: String
+    val disconnected: String
 
     // Settings screen
     val adbConfig: String

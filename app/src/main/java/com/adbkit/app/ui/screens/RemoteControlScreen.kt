@@ -344,7 +344,7 @@ private fun ScreenMirrorView(
                 dismissButton = {
                     Row {
                         TextButton(onClick = { viewModel.pasteFromClipboard(context); showInputDialog = false }) {
-                            Text("Paste")
+                            Text(strings.btnPaste)
                         }
                         TextButton(onClick = { showInputDialog = false }) {
                             Text(strings.close)
@@ -398,25 +398,25 @@ private fun BottomNavBar(
                 }
                 DropdownMenu(expanded = showMoreMenu, onDismissRequest = onDismissMore) {
                     DropdownMenuItem(
-                        text = { Text("Vol+") },
+                        text = { Text(strings.btnVolumeUp) },
                         onClick = { onVolumeUp(); onDismissMore() },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, null) }
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = strings.btnVolumeUp) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Vol-") },
+                        text = { Text(strings.btnVolumeDown) },
                         onClick = { onVolumeDown(); onDismissMore() },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeDown, null) }
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = strings.btnVolumeDown) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Power") },
+                        text = { Text(strings.btnPower) },
                         onClick = { onPower(); onDismissMore() },
-                        leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, null) }
+                        leadingIcon = { Icon(Icons.Filled.PowerSettingsNew, contentDescription = strings.btnPower) }
                     )
                     HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text(strings.disconnect, color = MaterialTheme.colorScheme.error) },
+                        text = { Text(strings.btnExit, color = MaterialTheme.colorScheme.error) },
                         onClick = { onExit(); onDismissMore() },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = MaterialTheme.colorScheme.error) }
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = strings.btnExit, tint = MaterialTheme.colorScheme.error) }
                     )
                 }
             }
@@ -442,6 +442,7 @@ private fun FloatingNavBar(
     onExit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalStrings.current
     var dragOffset by remember { mutableStateOf(offset) }
 
     LaunchedEffect(offset) {
@@ -487,27 +488,27 @@ private fun FloatingNavBar(
 
             if (expanded) {
                 IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.btnBack, modifier = Modifier.size(22.dp))
                 }
                 IconButton(onClick = onHome, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Filled.Home, contentDescription = "Home", modifier = Modifier.size(22.dp))
+                    Icon(Icons.Filled.Home, contentDescription = strings.btnHome, modifier = Modifier.size(22.dp))
                 }
                 IconButton(onClick = onRecent, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = "Recent", modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.ViewList, contentDescription = strings.btnRecent, modifier = Modifier.size(22.dp))
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 IconButton(onClick = onVolumeUp, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Vol+", modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = strings.btnVolumeUp, modifier = Modifier.size(22.dp))
                 }
                 IconButton(onClick = onVolumeDown, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = "Vol-", modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = strings.btnVolumeDown, modifier = Modifier.size(22.dp))
                 }
                 IconButton(onClick = onPower, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = "Power", modifier = Modifier.size(22.dp))
+                    Icon(Icons.Filled.PowerSettingsNew, contentDescription = strings.btnPower, modifier = Modifier.size(22.dp))
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 IconButton(onClick = onExit, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Exit", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = strings.btnExit, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(22.dp))
                 }
             }
         }

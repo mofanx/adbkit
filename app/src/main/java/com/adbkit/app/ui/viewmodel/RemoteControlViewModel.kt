@@ -6,13 +6,22 @@ import android.content.Context
 import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.adbkit.app.AdbKitApplication
+import com.adbkit.app.data.SettingsRepository
 import com.adbkit.app.service.AdbService
 import com.adbkit.app.service.ScreenStreamService
+import com.adbkit.app.ui.strings.AppStrings
+import com.adbkit.app.ui.strings.EnStrings
+import com.adbkit.app.ui.strings.ZhStrings
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import java.util.Locale
 
 data class RemoteControlUiState(
     val maxSize: String = "720",
@@ -43,9 +52,29 @@ class RemoteControlViewModel : ViewModel() {
     val streamService = ScreenStreamService()
 
     private var lowFpsFrames = 0
+    private var wasStreaming = false
+    private var strings: AppStrings = resolveLanguage("system")
+
+    private fun resolveLanguage(language: String): AppStrings = when (language) {
+        "zh" -> ZhStrings
+        "en" -> EnStrings
+        else -> if (Locale.getDefault().language == "zh") ZhStrings else EnStrings
+    }
+
+    private fun resolveStreamError(error: String): String = when {
+        error.contains("REMOTE_CONTROL_SERVER_MISSING") -> strings.remoteControlServerMissing
+        error.contains("REMOTE_CONTROL_PUSH_FAILED|") -> strings.remoteControlPushFailed + error.substringAfter("|")
+        error.contains("REMOTE_CONTROL_PUSH_FAILED") -> strings.remoteControlPushFailed
+        else -> error
+    }
 
     init {
         loadScreenSize()
+        viewModelScope.launch {
+            SettingsRepository(AdbKitApplication.instance).language.collect { lang ->
+                strings = resolveLanguage(lang)
+            }
+        }
         viewModelScope.launch {
             streamService.state.collect { streamState ->
                 val fps = streamState.fps
@@ -61,6 +90,20 @@ class RemoteControlViewModel : ViewModel() {
                         fpsLowWarning = lowFpsFrames >= 5
                     )
                 }
+                // Detect unexpected stream stop and return to settings
+                if (!streaming && wasStreaming) {
+                    _uiState.update { current ->
+                        if (current.isConnected) {
+                            current.copy(
+                                isConnected = false,
+                                isConnecting = false,
+                                statusMessage = if (streamState.error.isNotBlank()) strings.remoteControlStreamError + resolveStreamError(streamState.error) else current.statusMessage,
+                                isError = streamState.error.isNotBlank()
+                            )
+                        } else current
+                    }
+                }
+                if (streaming) wasStreaming = true
             }
         }
     }
@@ -107,7 +150,7 @@ class RemoteControlViewModel : ViewModel() {
                 maxSize = "480",
                 bitrate = "2Mbps",
                 weakNetworkMode = true,
-                statusMessage = "Weak network preset applied. Restart stream to take effect.",
+                statusMessage = strings.weakNetworkApplied,
                 isError = false
             )
         }
@@ -147,47 +190,73 @@ class RemoteControlViewModel : ViewModel() {
             disconnectRemoteControl()
             return
         }
+        wasStreaming = false
         if (AdbService.getCurrentDevice() == null) {
-            _uiState.update { it.copy(statusMessage = "No device connected", isError = true) }
+            _uiState.update { it.copy(statusMessage = strings.remoteControlNoDevice, isError = true) }
             return
         }
-        _uiState.update { it.copy(isConnecting = true, statusMessage = "Connecting...") }
+        _uiState.update { it.copy(isConnecting = true, isConnected = true, statusMessage = strings.remoteControlConnecting, isError = false) }
         viewModelScope.launch {
             val result = AdbService.shell("echo connected")
-            if (result.success) {
-                loadScreenSize()
-                val screenPowerMsg = if (_uiState.value.screenOff) {
-                    setDeviceScreenPower(false)
-                } else ""
+            if (!result.success) {
                 _uiState.update {
                     it.copy(
                         isConnecting = false,
-                        isConnected = true,
-                        statusMessage = if (screenPowerMsg.isBlank() || !screenPowerMsg.contains("failed")) "Remote control connected" else "Connected (${screenPowerMsg})",
-                        isError = false
-                    )
-                }
-            } else {
-                _uiState.update {
-                    it.copy(
-                        isConnecting = false,
-                        statusMessage = "Connection failed: ${result.error}",
+                        isConnected = false,
+                        statusMessage = strings.remoteControlConnectionFailed + result.error,
                         isError = true
                     )
                 }
+                return@launch
+            }
+            loadScreenSize()
+            val screenPowerMsg = if (_uiState.value.screenOff) setDeviceScreenPower(false) else ""
+            try {
+                val finalState = withTimeout(20_000) {
+                    streamService.state.first { it.isStreaming || it.error.isNotEmpty() }
+                }
+                if (finalState.isStreaming) {
+                    val base = strings.remoteControlConnected
+                    val msg = if (screenPowerMsg.isBlank() || !screenPowerMsg.contains("failed")) base else "$base (${screenPowerMsg})"
+                    _uiState.update { it.copy(isConnecting = false, statusMessage = msg, isError = false) }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isConnecting = false,
+                            isConnected = false,
+                            statusMessage = strings.remoteControlStreamError + resolveStreamError(finalState.error),
+                            isError = true
+                        )
+                    }
+                    stopStream()
+                }
+            } catch (e: TimeoutCancellationException) {
+                _uiState.update {
+                    it.copy(
+                        isConnecting = false,
+                        isConnected = false,
+                        statusMessage = strings.remoteControlConnectionFailed + e.message,
+                        isError = true
+                    )
+                }
+                stopStream()
             }
         }
     }
 
     fun disconnectRemoteControl() {
         val wasScreenOff = _uiState.value.screenOff
+        wasStreaming = false
         stopStream()
+        _uiState.update { it.copy(isConnected = false, isConnecting = false) }
         viewModelScope.launch {
-            val screenPowerMsg = if (wasScreenOff) {
-                setDeviceScreenPower(true)
-            } else ""
+            val screenPowerMsg = if (wasScreenOff) setDeviceScreenPower(true) else ""
+            val base = strings.disconnected
             _uiState.update {
-                it.copy(statusMessage = if (screenPowerMsg.isBlank()) "Disconnected" else "Disconnected (${screenPowerMsg})", isError = screenPowerMsg.contains("failed"))
+                it.copy(
+                    statusMessage = if (screenPowerMsg.isBlank()) base else "$base (${screenPowerMsg})",
+                    isError = screenPowerMsg.contains("failed")
+                )
             }
         }
     }
@@ -199,26 +268,26 @@ class RemoteControlViewModel : ViewModel() {
      */
     private suspend fun setDeviceScreenPower(on: Boolean): String {
         val mode = if (on) 2 else 0
-        val commands = listOf(
+        val root = AdbService.hasRootAccess()
+        val commands = listOfNotNull(
+            if (root) "su -c 'service call SurfaceFlinger 1035 i32 $mode' 2>/dev/null" else null,
             "service call SurfaceFlinger 1035 i32 $mode 2>/dev/null",
             "cmd display set-brightness ${if (on) "255" else "1"} 2>/dev/null",
             "settings put system screen_brightness ${if (on) "200" else "1"} 2>/dev/null",
-            if (!on) "svc power goToSleep 2>/dev/null" else "input keyevent 224 2>/dev/null",
-            if (!on) "input keyevent 26 2>/dev/null" else ""
-        ).filter { it.isNotBlank() }
+            if (!on) "svc power goToSleep 2>/dev/null" else null,
+            if (!on) "input keyevent 26 2>/dev/null" else null,
+            if (on) "input keyevent 224 2>/dev/null" else null
+        )
 
-        val failures = mutableListOf<String>()
         commands.forEach { cmd ->
             try {
                 val result = AdbService.shell(cmd)
                 if (result.success) {
-                    return "screen ${if (on) "on" else "off"} command sent"
+                    return if (on) strings.screenOnCommandSent else strings.screenOffCommandSent
                 }
-            } catch (e: Exception) {
-                failures.add(e.message ?: "exception")
-            }
+            } catch (_: Exception) {}
         }
-        return "screen power ${if (on) "on" else "off"} failed"
+        return if (on) strings.screenOnFailed else strings.screenOffFailed
     }
 
     fun stopStream() {
@@ -237,7 +306,7 @@ class RemoteControlViewModel : ViewModel() {
             val result = AdbService.inputText(text)
             _uiState.update {
                 it.copy(
-                    statusMessage = if (result.success) "Text sent" else "Send failed: ${result.error}",
+                    statusMessage = if (result.success) strings.remoteControlTextSent else strings.remoteControlTextSendFailed + result.error,
                     isError = !result.success
                 )
             }
@@ -250,7 +319,7 @@ class RemoteControlViewModel : ViewModel() {
         if (text.isNotBlank()) {
             sendText(text)
         } else {
-            _uiState.update { it.copy(statusMessage = "Clipboard is empty", isError = true) }
+            _uiState.update { it.copy(statusMessage = strings.remoteControlClipboardEmpty, isError = true) }
         }
     }
 

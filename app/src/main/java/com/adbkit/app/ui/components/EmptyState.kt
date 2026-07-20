@@ -31,8 +31,8 @@ import com.adbkit.app.ui.strings.LocalStrings
 
 @Composable
 fun LoadingState(
-    message: String? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    message: String? = null
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -54,10 +54,10 @@ fun LoadingState(
 @Composable
 fun EmptyState(
     title: String,
+    modifier: Modifier = Modifier,
     description: String? = null,
     actionLabel: String? = null,
-    onAction: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onAction: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier

@@ -48,7 +48,26 @@ class HomeViewModel : ViewModel() {
     init {
         refreshDevices()
         loadHistory()
+        observeCurrentDevice()
         _uiState.update { it.copy(localIp = getLocalIpAddress() ?: "") }
+    }
+
+    private fun observeCurrentDevice() {
+        viewModelScope.launch {
+            AdbService.currentDevice.collect { device ->
+                _uiState.update { current ->
+                    if (device == null && current.selectedDevice != null) {
+                        current.copy(
+                            selectedDevice = null,
+                            statusMessage = "Device disconnected",
+                            isError = false
+                        )
+                    } else {
+                        current.copy(selectedDevice = device)
+                    }
+                }
+            }
+        }
     }
 
     private fun loadHistory() {
